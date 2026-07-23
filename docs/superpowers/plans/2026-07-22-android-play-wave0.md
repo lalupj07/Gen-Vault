@@ -239,7 +239,7 @@ git commit -m "feat(android): About & legal screen with Privacy/Terms/Support li
 **Interfaces:**
 - Produces: Non-white splash; platform-neutral biometric strings on onboarding/tour
 
-- [ ] **Step 1: Add splash colors**
+- [x] **Step 1: Add splash colors**
 
 Create or update `src-tauri/gen/android/app/src/main/res/values/colors.xml`:
 
@@ -251,7 +251,7 @@ Create or update `src-tauri/gen/android/app/src/main/res/values/colors.xml`:
 </resources>
 ```
 
-- [ ] **Step 2: Theme splash background**
+- [x] **Step 2: Theme splash background**
 
 `values/themes.xml`:
 
@@ -269,7 +269,7 @@ Create or update `src-tauri/gen/android/app/src/main/res/values/colors.xml`:
 
 Do **not** add concentric ring drawables.
 
-- [ ] **Step 3: Fix onboarding biometric copy**
+- [x] **Step 3: Fix onboarding biometric copy**
 
 In `OnboardingFlow.tsx` step that mentions Windows Hello, change to:
 
@@ -287,7 +287,7 @@ In `welcomeTour.ts` settings step description, replace Windows Hello / FIDO2 / U
 
 Leave desktop-only SecondaryViews “Windows Hello” labels for Windows builds (optional later: gate with platform detect — **out of scope** unless easy; Wave 0 only requires mobile onboarding/tour).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src-tauri/gen/android/app/src/main/res/values/colors.xml \

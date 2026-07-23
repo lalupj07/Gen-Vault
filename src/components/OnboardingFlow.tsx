@@ -34,9 +34,9 @@ const steps = [
   {
     id: 'biometric',
     title: 'Multi-Factor Unlock',
-    subtitle: 'Password plus optional biometrics',
+    subtitle: 'Password, PIN, or biometrics',
     description:
-      'Master password unlocks the vault. Optional fingerprint, face, or security key confirms presence — they never recover the vault key alone.',
+      'Layered security with master password, PIN, and optional fingerprint or face unlock. Your vault, your unlock method.',
     icon: Fingerprint,
     color: '#00e676',
   },
