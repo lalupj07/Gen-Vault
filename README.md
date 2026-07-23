@@ -1,80 +1,85 @@
 <p align="center">
-  <img src="public/genvault-icon.png" alt="GenVault icon" width="128" height="128" />
+  <img src="public/genvault-icon.png" alt="GenVault" width="160" height="160" />
 </p>
 
-<h1 align="center">GenVault</h1>
+<h1 align="center">🔐 GenVault</h1>
+
+---
 
 <p align="center">
-  <strong>The offline password &amp; TOTP vault</strong><br />
-  by <a href="https://genxis.in">GenXis Innovations</a>
-</p>
-
-<p align="center">
-  <a href="#download"><img src="https://img.shields.io/badge/Windows-Microsoft%20Store-0078D4?style=for-the-badge&logo=microsoft&logoColor=white" alt="Microsoft Store" /></a>
-  <img src="https://img.shields.io/badge/Android-Play%20Store%20soon-3DDC84?style=for-the-badge&logo=googleplay&logoColor=white" alt="Google Play coming soon" />
-</p>
-
-<p align="center">
-  <a href="./SECURITY.md"><img src="https://img.shields.io/badge/security-hardened-0B6E4F?style=flat-square" alt="Security" /></a>
-  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-1B4F72?style=flat-square" alt="License" /></a>
-  <img src="https://img.shields.io/badge/tag-offline-922B21?style=flat-square" alt="offline" />
-  <img src="https://img.shields.io/badge/tag-password--manager-1A5276?style=flat-square" alt="password-manager" />
-  <img src="https://img.shields.io/badge/tag-totp-5B2C6F?style=flat-square" alt="totp" />
-  <img src="https://img.shields.io/badge/tag-2fa-6C3483?style=flat-square" alt="2fa" />
-  <img src="https://img.shields.io/badge/tag-tauri-2E86C1?style=flat-square" alt="tauri" />
-  <img src="https://img.shields.io/badge/tag-rust-B7410E?style=flat-square" alt="rust" />
-  <img src="https://img.shields.io/badge/tag-android-3DDC84?style=flat-square" alt="android" />
-  <img src="https://img.shields.io/badge/tag-windows-0078D4?style=flat-square" alt="windows" />
-</p>
-
-<p align="center">
-  Master-password gated · AES-256-GCM at rest · Argon2id KDF · No cloud required
+  <strong>The Ultimate Offline Password &amp; TOTP Security Vault</strong><br />
+  Modern, Fast, and Secure Authentication for Windows &amp; Android
 </p>
 
 ---
 
-## Download
-
 <p align="center">
-  <a href="https://apps.microsoft.com/detail/9P8PJDTP506T?hl=en-us&gl=IN&ocid=pdpshare">
-    <img src="https://get.microsoft.com/images/en-us%20dark.svg" alt="Get it from Microsoft" height="56" />
-  </a>
-  &nbsp;&nbsp;
-  <img src="https://img.shields.io/badge/Google%20Play-Release%20soon-3DDC84?style=for-the-badge&logo=googleplay&logoColor=white" alt="Google Play — release soon" height="56" />
+  <img src="https://img.shields.io/badge/VERSION-1.0.0-2E86C1?style=flat-square&labelColor=2C3E50" alt="Version" />
+  <img src="https://img.shields.io/badge/LICENSE-MIT-E67E22?style=flat-square&labelColor=2C3E50" alt="License" />
+  <img src="https://img.shields.io/badge/PLATFORM-WINDOWS%20%7C%20ANDROID-5DADE2?style=flat-square&labelColor=2C3E50" alt="Platform" />
+  <img src="https://img.shields.io/badge/GENXIS-INNOVATIONS-8E44AD?style=flat-square&labelColor=2C3E50" alt="GenXis" />
+  <img src="https://img.shields.io/badge/SYNC-OFFLINE%20FIRST-922B21?style=flat-square&labelColor=2C3E50" alt="Offline" />
 </p>
 
-| Platform | Status | Get it |
-|----------|--------|--------|
-| **Windows** | Available | [Download on Microsoft Store](https://apps.microsoft.com/detail/9P8PJDTP506T?hl=en-us&gl=IN&ocid=pdpshare) |
-| **Android** | Release soon | Google Play — coming soon |
-
-Sideload / CI builds stay on [GitHub Releases](https://github.com/lalupj07/Gen-Vault/releases) for testers — store builds are the recommended install path.
+<p align="center">
+  🚀 <a href="#-quick-start-developers">Quick Start</a>
+  &nbsp;•&nbsp;
+  📦 <a href="#-download">Download</a>
+  &nbsp;•&nbsp;
+  🔒 <a href="#-security">Security</a>
+  &nbsp;•&nbsp;
+  📖 <a href="#-overview">About</a>
+</p>
 
 ---
 
-## Why GenVault
+## 🎯 Overview
 
-GenVault keeps **credentials and 2FA secrets on your device**. Unlock locally, copy codes securely, lock when you leave. No mandatory cloud sync — and no server that can read your vault.
+**GenVault** is an offline-first password and TOTP vault by **GenXis Innovations**.  
+Your credentials and 2FA secrets stay **on your device** — encrypted with **AES-256-GCM**, unlocked with your master password (plus biometrics when you choose).
+
+Built with **Tauri 2**, **Rust**, and **Next.js** for a fast desktop shell on Windows and a Material You experience on Android. No Cognito. No mandatory cloud sync. No server that can read your vault.
 
 | You get | You avoid |
 |---------|-----------|
-| Encrypted vault on device | Cloud-held plaintext or sync side-channels |
+| Encrypted vault on device | Cloud-held plaintext |
 | TOTP / HOTP codes | Shipping seeds to a third party |
 | Biometrics + password | Biometrics as the only factor |
-| Windows + Android | Browser-only toy vaults |
+| Microsoft Store install | Browser-only toy vaults |
 
-## Features
+---
 
-- **Password & TOTP vault** — accounts, secrets, notes, tags, favorites
-- **Strong unlock** — master password, PIN, Windows Hello / Android biometrics, optional security key
-- **Secure clipboard** — timed clear for OTP and secrets
-- **Encrypted backup / USB export** — passphrase-wrapped portable backups
-- **Recovery codes** — one-time offline recovery
-- **QR enroll** — scan TOTP provisioning QR on Android
-- **Material You mobile UI** — glass shell, fonts, languages, in-app back stack
-- **Privacy-minded** — screenshot / FLAG_SECURE protections where the OS allows
+## 📦 Download
 
-## Security (short)
+<p align="center">
+  <a href="https://apps.microsoft.com/detail/9P8PJDTP506T?hl=en-us&gl=IN&ocid=pdpshare">
+    <img src="https://get.microsoft.com/images/en-us%20dark.svg" alt="Get it from Microsoft" height="60" />
+  </a>
+</p>
+
+| Platform | Status | Action |
+|----------|--------|--------|
+| **Windows** | Available now | [Download on Microsoft Store](https://apps.microsoft.com/detail/9P8PJDTP506T?hl=en-us&gl=IN&ocid=pdpshare) |
+| **Android** | Release soon | Google Play — coming soon |
+
+Tester / CI builds: [GitHub Releases](https://github.com/lalupj07/Gen-Vault/releases) (binaries are not stored in git).
+
+---
+
+## ✨ Features
+
+- **Password & TOTP vault** — accounts, secrets, notes, tags, favorites  
+- **Strong unlock** — master password, PIN, Windows Hello / Android biometrics, optional security key  
+- **Secure clipboard** — timed clear for OTP and secrets  
+- **Encrypted backup / USB export** — passphrase-wrapped portable backups  
+- **Recovery codes** — one-time offline recovery  
+- **QR enroll** — scan TOTP provisioning QR on Android  
+- **Material You mobile UI** — glass shell, fonts, languages, in-app back stack  
+- **Privacy-minded** — screenshot / FLAG_SECURE protections where the OS allows  
+
+---
+
+## 🔒 Security
 
 | Layer | Detail |
 |-------|--------|
@@ -86,9 +91,7 @@ GenVault keeps **credentials and 2FA secrets on your device**. Unlock locally, c
 | Notes | Omitted from list DTOs; master-password step-up to reveal |
 | Android | Keystore-backed protector + BiometricPrompt on unlock consent |
 
-Full write-up: **[SECURITY.md](./SECURITY.md)** · Store privacy: **[store/PRIVACY_POLICY.md](./store/PRIVACY_POLICY.md)**
-
-## Architecture
+Full details: **[SECURITY.md](./SECURITY.md)** · Privacy: **[store/PRIVACY_POLICY.md](./store/PRIVACY_POLICY.md)**
 
 ```mermaid
 flowchart LR
@@ -99,15 +102,11 @@ flowchart LR
   Store --> Disk[(On-device storage)]
 ```
 
-## Quick start (developers)
+---
 
-### Prerequisites
+## 🚀 Quick Start (developers)
 
-- Node.js 20+
-- Rust (stable) + Cargo
-- For Android: Android SDK / JDK 21 (see `BUILD_RELEASE.md`)
-
-### Develop
+**Prerequisites:** Node.js 20+, Rust (stable), Android SDK / JDK 21 for mobile.
 
 ```bash
 npm install
@@ -120,18 +119,16 @@ Android:
 npm run tauri:android:dev
 ```
 
-### Release builds
+Release builds:
 
 ```bash
-npm run build:release          # Windows bundles
-npm run tauri:android:build    # Android APK / AAB
+npm run build:release          # Windows
+npm run tauri:android:build    # Android
 ```
 
-Installers and APKs are **gitignored**. Attach them to [GitHub Releases](https://github.com/lalupj07/Gen-Vault/releases) — do not commit binaries.
+More: [BUILD_QUICK_START.md](./BUILD_QUICK_START.md) · [BUILD_RELEASE.md](./BUILD_RELEASE.md) · [DEPLOYMENT.md](./DEPLOYMENT.md) · [CONTRIBUTING.md](./CONTRIBUTING.md)
 
-More: [BUILD_QUICK_START.md](./BUILD_QUICK_START.md) · [BUILD_RELEASE.md](./BUILD_RELEASE.md) · [DEPLOYMENT.md](./DEPLOYMENT.md)
-
-## Repository layout
+### Repository layout
 
 ```text
 src/                 React / Next.js UI (desktop + mobile shell)
@@ -141,30 +138,61 @@ scripts/             Windows / MSIX build helpers
 .github/workflows/   CI (build + security scan)
 ```
 
-## Configuration
+---
 
-No cloud secrets are required. Optional local overrides: copy [`.env.example`](./.env.example) → `.env.local` (never commit).
+## 🌐 Links & Resources
 
-## Contributing
+<p align="center">
+  <a href="https://github.com/lalupj07/Gen-Vault/releases"><img src="https://img.shields.io/github/v/release/lalupj07/Gen-Vault?style=for-the-badge&label=Latest%20Release&color=2E86C1" alt="Latest Release" /></a>
+  <a href="https://github.com/lalupj07/Gen-Vault/issues"><img src="https://img.shields.io/github/issues/lalupj07/Gen-Vault?style=for-the-badge&label=Issues&color=5DADE2" alt="Issues" /></a>
+  <a href="https://github.com/lalupj07/Gen-Vault/issues/new"><img src="https://img.shields.io/badge/Report-Bug-E74C3C?style=for-the-badge" alt="Report Bug" /></a>
+</p>
 
-See **[CONTRIBUTING.md](./CONTRIBUTING.md)**. Keep security first — never commit `.env`, keystores, or vault data.
+<p align="center">
+  <a href="./store/PRIVACY_POLICY.md"><img src="https://img.shields.io/badge/Privacy-Policy-27AE60?style=for-the-badge" alt="Privacy Policy" /></a>
+  <a href="./CHANGELOG.md"><img src="https://img.shields.io/badge/Changelog-v1.0.0-E67E22?style=for-the-badge" alt="Changelog" /></a>
+  <a href="https://apps.microsoft.com/detail/9P8PJDTP506T?hl=en-us&gl=IN&ocid=pdpshare"><img src="https://img.shields.io/badge/Microsoft-Store-0078D4?style=for-the-badge&logo=microsoft&logoColor=white" alt="Microsoft Store" /></a>
+  <img src="https://img.shields.io/badge/Google%20Play-Soon-3DDC84?style=for-the-badge&logo=googleplay&logoColor=white" alt="Google Play soon" />
+</p>
 
-## License
+---
 
-[MIT](./LICENSE) © GenXis Innovations
+## ⭐ Show Your Support
+
+<p align="center">
+  If you find <strong>GenVault</strong> useful, please consider giving it a ⭐ on GitHub!<br />
+  Your support helps us improve GenVault for everyone.
+</p>
+
+<p align="center">
+  <a href="https://github.com/lalupj07/Gen-Vault/stargazers"><img src="https://img.shields.io/github/stars/lalupj07/Gen-Vault?style=for-the-badge&logo=github&label=Stars" alt="Stars" /></a>
+  <a href="https://github.com/lalupj07/Gen-Vault/network/members"><img src="https://img.shields.io/github/forks/lalupj07/Gen-Vault?style=for-the-badge&logo=github&label=Forks" alt="Forks" /></a>
+  <a href="https://github.com/lalupj07/Gen-Vault/watchers"><img src="https://img.shields.io/github/watchers/lalupj07/Gen-Vault?style=for-the-badge&logo=github&label=Watchers" alt="Watchers" /></a>
+</p>
+
+---
+
+## 🏢 About GenXis Innovations
+
+<p align="center">
+  Empowering people with modern, secure, offline-first software.<br />
+  Kottayam, Kerala, India
+</p>
+
+<p align="center">
+  <a href="https://genxis.in">genxis.in</a>
+  &nbsp;·&nbsp;
+  <a href="https://www.genxisinnovation.in">genxisinnovation.in</a>
+  &nbsp;·&nbsp;
+  <a href="mailto:genxisinnovation@outlook.com">genxisinnovation@outlook.com</a>
+</p>
 
 ---
 
 <p align="center">
-  <img src="public/genvault-icon.png" alt="" width="40" height="40" /><br /><br />
-  <strong>GenVault</strong> — your secrets stay on your device.<br />
-  <a href="https://apps.microsoft.com/detail/9P8PJDTP506T?hl=en-us&gl=IN&ocid=pdpshare">Microsoft Store</a>
-  · Google Play (soon)
-  · <a href="https://genxis.in">genxis.in</a>
-  · <a href="./SECURITY.md">Security</a>
-  · <a href="./CHANGELOG.md">Changelog</a>
+  🎉 Made with ❤️ by <a href="https://genxis.in">GenXis Innovations</a>
 </p>
 
 <p align="center">
-  <sub>Built offline-first by GenXis Innovations · Windows available now · Android Play release soon</sub>
+  <sub>GenVault · Windows on Microsoft Store · Android Play release soon · MIT License</sub>
 </p>
