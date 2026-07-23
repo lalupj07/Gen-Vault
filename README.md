@@ -1,20 +1,30 @@
 <p align="center">
-  <img src="public/genvault-icon.png" alt="GenVault" width="96" height="96" />
+  <img src="public/genvault-icon.png" alt="GenVault icon" width="128" height="128" />
 </p>
 
 <h1 align="center">GenVault</h1>
 
 <p align="center">
-  <strong>Offline password &amp; TOTP vault</strong><br />
+  <strong>The offline password &amp; TOTP vault</strong><br />
   by <a href="https://genxis.in">GenXis Innovations</a>
 </p>
 
 <p align="center">
-  <a href="./SECURITY.md"><img src="https://img.shields.io/badge/Security-Hardened-0B6E4F?style=flat-square" alt="Security" /></a>
-  <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-1B4F72?style=flat-square" alt="License" /></a>
-  <img src="https://img.shields.io/badge/Platforms-Windows%20%7C%20Android-1A5276?style=flat-square" alt="Platforms" />
-  <img src="https://img.shields.io/badge/Stack-Tauri%202%20%2B%20Rust%20%2B%20Next.js-5B2C6F?style=flat-square" alt="Stack" />
-  <img src="https://img.shields.io/badge/Sync-Offline%20first-922B21?style=flat-square" alt="Offline" />
+  <a href="#download"><img src="https://img.shields.io/badge/Windows-Microsoft%20Store-0078D4?style=for-the-badge&logo=microsoft&logoColor=white" alt="Microsoft Store" /></a>
+  <img src="https://img.shields.io/badge/Android-Play%20Store%20soon-3DDC84?style=for-the-badge&logo=googleplay&logoColor=white" alt="Google Play coming soon" />
+</p>
+
+<p align="center">
+  <a href="./SECURITY.md"><img src="https://img.shields.io/badge/security-hardened-0B6E4F?style=flat-square" alt="Security" /></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-1B4F72?style=flat-square" alt="License" /></a>
+  <img src="https://img.shields.io/badge/tag-offline-922B21?style=flat-square" alt="offline" />
+  <img src="https://img.shields.io/badge/tag-password--manager-1A5276?style=flat-square" alt="password-manager" />
+  <img src="https://img.shields.io/badge/tag-totp-5B2C6F?style=flat-square" alt="totp" />
+  <img src="https://img.shields.io/badge/tag-2fa-6C3483?style=flat-square" alt="2fa" />
+  <img src="https://img.shields.io/badge/tag-tauri-2E86C1?style=flat-square" alt="tauri" />
+  <img src="https://img.shields.io/badge/tag-rust-B7410E?style=flat-square" alt="rust" />
+  <img src="https://img.shields.io/badge/tag-android-3DDC84?style=flat-square" alt="android" />
+  <img src="https://img.shields.io/badge/tag-windows-0078D4?style=flat-square" alt="windows" />
 </p>
 
 <p align="center">
@@ -23,9 +33,28 @@
 
 ---
 
+## Download
+
+<p align="center">
+  <a href="https://apps.microsoft.com/detail/9P8PJDTP506T?hl=en-us&gl=IN&ocid=pdpshare">
+    <img src="https://get.microsoft.com/images/en-us%20dark.svg" alt="Get it from Microsoft" height="56" />
+  </a>
+  &nbsp;&nbsp;
+  <img src="https://img.shields.io/badge/Google%20Play-Release%20soon-3DDC84?style=for-the-badge&logo=googleplay&logoColor=white" alt="Google Play — release soon" height="56" />
+</p>
+
+| Platform | Status | Get it |
+|----------|--------|--------|
+| **Windows** | Available | [Download on Microsoft Store](https://apps.microsoft.com/detail/9P8PJDTP506T?hl=en-us&gl=IN&ocid=pdpshare) |
+| **Android** | Release soon | Google Play — coming soon |
+
+Sideload / CI builds stay on [GitHub Releases](https://github.com/lalupj07/Gen-Vault/releases) for testers — store builds are the recommended install path.
+
+---
+
 ## Why GenVault
 
-GenVault keeps **credentials and 2FA secrets on your device**. Unlock locally, copy codes securely, lock when you leave. There is no Cognito account, no mandatory sync, and no server that can read your vault.
+GenVault keeps **credentials and 2FA secrets on your device**. Unlock locally, copy codes securely, lock when you leave. No mandatory cloud sync — and no server that can read your vault.
 
 | You get | You avoid |
 |---------|-----------|
@@ -70,7 +99,7 @@ flowchart LR
   Store --> Disk[(On-device storage)]
 ```
 
-## Quick start
+## Quick start (developers)
 
 ### Prerequisites
 
@@ -118,9 +147,7 @@ No cloud secrets are required. Optional local overrides: copy [`.env.example`](.
 
 ## Contributing
 
-1. Keep security first — never commit `.env`, keystores, or vault data.
-2. Prefer minimal diffs; validate unlock + clipboard paths when touching crypto/IPC.
-3. Run `npm run test:security` and `cargo check` in `src-tauri` before opening a PR.
+See **[CONTRIBUTING.md](./CONTRIBUTING.md)**. Keep security first — never commit `.env`, keystores, or vault data.
 
 ## License
 
@@ -129,8 +156,15 @@ No cloud secrets are required. Optional local overrides: copy [`.env.example`](.
 ---
 
 <p align="center">
-  <a href="https://genxis.in">genxis.in</a> ·
-  <a href="./SECURITY.md">Security</a> ·
-  <a href="./CHANGELOG.md">Changelog</a> ·
-  <a href="./store/STORE_LISTING.md">Store listing</a>
+  <img src="public/genvault-icon.png" alt="" width="40" height="40" /><br /><br />
+  <strong>GenVault</strong> — your secrets stay on your device.<br />
+  <a href="https://apps.microsoft.com/detail/9P8PJDTP506T?hl=en-us&gl=IN&ocid=pdpshare">Microsoft Store</a>
+  · Google Play (soon)
+  · <a href="https://genxis.in">genxis.in</a>
+  · <a href="./SECURITY.md">Security</a>
+  · <a href="./CHANGELOG.md">Changelog</a>
+</p>
+
+<p align="center">
+  <sub>Built offline-first by GenXis Innovations · Windows available now · Android Play release soon</sub>
 </p>

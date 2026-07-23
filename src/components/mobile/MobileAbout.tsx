@@ -27,6 +27,28 @@ export default function MobileAbout() {
       <p className="text-xs text-[color:var(--md-on-surface-variant)]">{t('mobile.about.blurb')}</p>
       <GlassSurface className="overflow-hidden p-0 divide-y divide-[color:var(--md-outline-variant)]">
         <a
+          href={COMPANY.microsoftStoreUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-between min-h-[52px] px-4 text-sm text-[color:var(--md-on-surface)]"
+        >
+          Download on Microsoft Store <ExternalLink className="w-4 h-4 text-[color:var(--md-on-surface-variant)]" />
+        </a>
+        {COMPANY.playStoreUrl ? (
+          <a
+            href={COMPANY.playStoreUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-between min-h-[52px] px-4 text-sm text-[color:var(--md-on-surface)]"
+          >
+            Get it on Google Play <ExternalLink className="w-4 h-4 text-[color:var(--md-on-surface-variant)]" />
+          </a>
+        ) : (
+          <div className="flex items-center justify-between min-h-[52px] px-4 text-sm text-[color:var(--md-on-surface-variant)]">
+            {COMPANY.playStoreLabel}
+          </div>
+        )}
+        <a
           href={COMPANY.privacyUrl}
           target="_blank"
           rel="noopener noreferrer"

@@ -8,6 +8,12 @@ export const COMPANY = {
   // Publish these paths on the site before Play submit (content mirrors store/*.md)
   privacyUrl: 'https://www.genxisinnovation.in/privacy',
   termsUrl: 'https://www.genxisinnovation.in/terms',
+  /** Windows — Microsoft Store listing */
+  microsoftStoreUrl:
+    'https://apps.microsoft.com/detail/9P8PJDTP506T?hl=en-us&gl=IN&ocid=pdpshare',
+  /** Android — set when Play listing is live */
+  playStoreUrl: null as string | null,
+  playStoreLabel: 'Google Play — release soon',
   copyright: '© 2025 GenXis Innovations. All rights reserved.',
   licenses: ['Apache License 2.0', 'MIT License'] as const,
   licenseSpdx: 'MIT',
