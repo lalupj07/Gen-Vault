@@ -134,7 +134,7 @@ describe('Security Tests', () => {
       expect(/[A-Z]/.test(password)).toBe(true);
       expect(/[a-z]/.test(password)).toBe(true);
       expect(/[0-9]/.test(password)).toBe(true);
-      expect(/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)).toBe(true);
+      expect(/[!@#$%^&*]/.test(password)).toBe(true);
     });
 
     test('should generate different passwords each time', () => {

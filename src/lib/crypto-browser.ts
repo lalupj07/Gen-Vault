@@ -115,16 +115,31 @@ function constantTimeCompare(a: string, b: string): boolean {
  * Generate a secure random password for vault encryption
  */
 export function generateSecurePassword(length: number = 32): string {
-  const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
-  const array = new Uint8Array(length);
+  const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const lower = 'abcdefghijklmnopqrstuvwxyz';
+  const digits = '0123456789';
+  const special = '!@#$%^&*';
+  const all = upper + lower + digits + special;
+  const n = Math.max(length, 12);
+  const array = new Uint8Array(n);
   crypto.getRandomValues(array);
-  
-  let password = '';
-  for (let i = 0; i < length; i++) {
-    password += charset[array[i] % charset.length];
+
+  // Guarantee one char from each class, then fill from full charset.
+  const picks = [
+    upper[array[0] % upper.length],
+    lower[array[1] % lower.length],
+    digits[array[2] % digits.length],
+    special[array[3] % special.length],
+  ];
+  for (let i = 4; i < n; i++) {
+    picks.push(all[array[i] % all.length]);
   }
-  
-  return password;
+  // Shuffle
+  for (let i = picks.length - 1; i > 0; i--) {
+    const j = array[i % array.length] % (i + 1);
+    [picks[i], picks[j]] = [picks[j], picks[i]];
+  }
+  return picks.join('');
 }
 
 /**

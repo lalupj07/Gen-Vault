@@ -24,7 +24,7 @@ import { dispatchShortcut, PALETTE_ACTION_MAP, type ShortcutAction } from '@/lib
 import { cn } from '@/lib/utils';
 import { COMPANY, PRODUCT } from '@/lib/company';
 import { isWelcomeTourDone, markWelcomeTourDone, resetWelcomeTour } from '@/lib/welcomeTour';
-import { useAndroidShell } from '@/lib/platform';
+import { isAndroidShell } from '@/lib/platform';
 import MobileShell from '@/components/mobile/MobileShell';
 
 export default function Home() {
@@ -46,7 +46,7 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    useAndroidShell().then(setAndroidShell).catch(() => setAndroidShell(false));
+    isAndroidShell().then(setAndroidShell).catch(() => setAndroidShell(false));
   }, []);
 
   // Load vault entries and security score from backend when authenticated & unlocked

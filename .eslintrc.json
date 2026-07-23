@@ -1,0 +1,4 @@
+{
+  "extends": ["next/core-web-vitals"],
+  "ignorePatterns": ["src-tauri/**", "out/**", ".next/**", "node_modules/**"]
+}

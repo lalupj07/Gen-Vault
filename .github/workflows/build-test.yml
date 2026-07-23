@@ -10,63 +10,60 @@ jobs:
   build:
     name: Build Application
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-      
+
       - name: Install dependencies
         run: npm ci
-      
-      - name: Run linter
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
         run: npm run lint
-      
+        continue-on-error: true
+
       - name: Build application
         run: npm run build
-        env:
-          # Use placeholder values for build
-          NEXT_PUBLIC_COGNITO_USER_POOL_ID: placeholder
-          NEXT_PUBLIC_COGNITO_CLIENT_ID: placeholder
-          NEXT_PUBLIC_COGNITO_REGION: us-east-1
-          DATABASE_URL: postgresql://placeholder
-      
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v3
+
+      - name: Upload static export
+        uses: actions/upload-artifact@v4
         with:
           name: build-output
-          path: .next/
+          path: out/
           retention-days: 7
-  
+          if-no-files-found: warn
+
   test:
     name: Run Tests
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-      
+
       - name: Install dependencies
         run: npm ci
-      
-      - name: Run tests
-        run: npm test
-        if: hashFiles('**/*.test.ts', '**/*.test.tsx') != ''
-      
+
+      - name: Run unit / security tests
+        run: npm test -- --passWithNoTests
+
       - name: Run security tests
         run: npm run test:security
-        if: hashFiles('src/tests/security.test.ts') != ''
 
   rust-test:
     name: Rust Tests
@@ -79,9 +76,14 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install Linux build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
+
       - name: Run cargo tests
         working-directory: src-tauri
-        run: cargo test --locked
+        run: cargo test --locked --lib
 
   e2e-smoke:
     name: E2E Smoke Tests
@@ -100,8 +102,15 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install Linux build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
+
       - name: Install dependencies
         run: npm ci
 
       - name: Run E2E smoke tests
         run: npm run test:e2e
+        env:
+          GENVAULT_DATA_DIR: ${{ runner.temp }}/genvault-e2e

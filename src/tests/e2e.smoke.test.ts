@@ -27,7 +27,7 @@ describe('GenVault API smoke', () => {
   });
 
   it('rejects browser-only invocation', async () => {
-    await expect(api.checkAccountExists()).rejects.toThrow(/desktop application/i);
+    await expect(api.checkAccountExists()).rejects.toThrow(/GenVault application|Browser mode is disabled/i);
   });
 });
 

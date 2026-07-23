@@ -46,20 +46,29 @@ fn decode_secret(secret: &str) -> Result<Vec<u8>, String> {
         && s.len() % 2 == 0
         && s.chars().all(|c| c.is_ascii_hexdigit());
 
-    // Canonical base32 (contains G–Z or other non-hex symbols).
-    if !hex_only {
-        if let Ok(bytes) = Secret::Encoded(s.to_string()).to_bytes() {
+    // Legacy imports stored hex-encoded key bytes (exact even-length hex).
+    if hex_only {
+        if let Ok(bytes) = hex::decode(s) {
             if !bytes.is_empty() {
                 return Ok(bytes);
             }
         }
     }
 
-    // Legacy imports stored hex-encoded key bytes.
-    if hex_only {
-        return hex::decode(s).map_err(|e| format!("Invalid secret: {}", e));
+    // Match encode_secret_bytes (base32 crate Rfc4648).
+    let unpadded = s.trim_end_matches('=');
+    if let Some(bytes) = base32::decode(base32::Alphabet::Rfc4648 { padding: false }, unpadded) {
+        if !bytes.is_empty() {
+            return Ok(bytes);
+        }
+    }
+    if let Some(bytes) = base32::decode(base32::Alphabet::Rfc4648 { padding: true }, s) {
+        if !bytes.is_empty() {
+            return Ok(bytes);
+        }
     }
 
+    // totp-rs encoded secrets (otpauth-style).
     Secret::Encoded(s.to_string())
         .to_bytes()
         .map_err(|e| format!("Invalid secret: {}", e))
@@ -201,20 +210,19 @@ mod tests {
 
     #[test]
     fn decodes_base32_and_legacy_hex_secrets() {
-        let raw = b"test secret bytes!";
+        // 16 bytes — meets TOTP 128-bit minimum and avoids hex/base32 ambiguity.
+        let raw = b"0123456789abcdef";
         let b32 = encode_secret_bytes(raw);
         let hex = hex::encode(raw);
 
-        assert_eq!(decode_secret(&b32).expect("base32"), raw);
-        assert_eq!(decode_secret(&hex).expect("hex"), raw);
+        assert_eq!(decode_secret(&b32).expect("base32"), raw.to_vec());
+        assert_eq!(decode_secret(&hex).expect("hex"), raw.to_vec());
     }
 
     #[test]
     fn generates_totp_from_hex_imported_secret() {
-        // JBSWY3DPEHPK3PXP = "Hello!" in base32
-        let raw = base32::decode(base32::Alphabet::Rfc4648 { padding: true }, "JBSWY3DPEHPK3PXP")
-            .expect("fixture");
-        let hex = hex::encode(&raw);
+        let raw = b"0123456789abcdef";
+        let hex = hex::encode(raw);
         let code = generate_code(
             &hex,
             6,
