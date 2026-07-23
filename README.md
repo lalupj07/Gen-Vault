@@ -143,8 +143,8 @@ scripts/             Windows / MSIX build helpers
 ## 🌐 Links & Resources
 
 <p align="center">
-  <a href="https://github.com/lalupj07/Gen-Vault/releases"><img src="https://img.shields.io/github/v/release/lalupj07/Gen-Vault?style=for-the-badge&label=Latest%20Release&color=2E86C1" alt="Latest Release" /></a>
-  <a href="https://github.com/lalupj07/Gen-Vault/issues"><img src="https://img.shields.io/github/issues/lalupj07/Gen-Vault?style=for-the-badge&label=Issues&color=5DADE2" alt="Issues" /></a>
+  <a href="https://github.com/lalupj07/Gen-Vault/releases"><img src="https://img.shields.io/badge/Latest%20Release-v1.0.0-2E86C1?style=for-the-badge" alt="Latest Release" /></a>
+  <a href="https://github.com/lalupj07/Gen-Vault/issues"><img src="https://img.shields.io/badge/Issues-Open-5DADE2?style=for-the-badge" alt="Issues" /></a>
   <a href="https://github.com/lalupj07/Gen-Vault/issues/new"><img src="https://img.shields.io/badge/Report-Bug-E74C3C?style=for-the-badge" alt="Report Bug" /></a>
 </p>
 
@@ -165,9 +165,8 @@ scripts/             Windows / MSIX build helpers
 </p>
 
 <p align="center">
-  <a href="https://github.com/lalupj07/Gen-Vault/stargazers"><img src="https://img.shields.io/github/stars/lalupj07/Gen-Vault?style=for-the-badge&logo=github&label=Stars" alt="Stars" /></a>
-  <a href="https://github.com/lalupj07/Gen-Vault/network/members"><img src="https://img.shields.io/github/forks/lalupj07/Gen-Vault?style=for-the-badge&logo=github&label=Forks" alt="Forks" /></a>
-  <a href="https://github.com/lalupj07/Gen-Vault/watchers"><img src="https://img.shields.io/github/watchers/lalupj07/Gen-Vault?style=for-the-badge&logo=github&label=Watchers" alt="Watchers" /></a>
+  <a href="https://github.com/lalupj07/Gen-Vault"><img src="https://img.shields.io/badge/GitHub-Star%20this%20repo-2C3E50?style=for-the-badge&logo=github&logoColor=white" alt="Star on GitHub" /></a>
+  <a href="https://github.com/lalupj07/Gen-Vault/fork"><img src="https://img.shields.io/badge/GitHub-Fork-2E86C1?style=for-the-badge&logo=github&logoColor=white" alt="Fork" /></a>
 </p>
 
 ---
@@ -180,9 +179,7 @@ scripts/             Windows / MSIX build helpers
 </p>
 
 <p align="center">
-  <a href="https://genxis.in">genxis.in</a>
-  &nbsp;·&nbsp;
-  <a href="https://www.genxisinnovation.in">genxisinnovation.in</a>
+  <a href="https://www.genxisinnovation.in">www.genxisinnovation.in</a>
   &nbsp;·&nbsp;
   <a href="mailto:genxisinnovation@outlook.com">genxisinnovation@outlook.com</a>
 </p>
@@ -190,7 +187,7 @@ scripts/             Windows / MSIX build helpers
 ---
 
 <p align="center">
-  🎉 Made with ❤️ by <a href="https://genxis.in">GenXis Innovations</a>
+  🎉 Made with ❤️ by <a href="https://www.genxisinnovation.in">GenXis Innovations</a>
 </p>
 
 <p align="center">
