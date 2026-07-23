@@ -1,0 +1,223 @@
+mod app_paths;
+#[cfg(target_os = "android")]
+mod android_keystore;
+mod attachments;
+pub mod commands;
+pub mod crypto;
+mod entry_history;
+mod fido;
+mod hello;
+mod hibp;
+mod import_export;
+pub mod models;
+mod password_generator;
+mod rate_limit;
+pub mod recovery_codes;
+mod secure_file;
+mod security_questions;
+pub mod store;
+mod templates;
+mod totp_gen;
+mod usb_drives;
+pub mod vault_db;
+
+use commands::*;
+
+#[cfg(target_os = "android")]
+use tauri::Manager;
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    let builder = tauri::Builder::default();
+    #[cfg(mobile)]
+    let builder = builder.plugin(tauri_plugin_biometric::init());
+    #[cfg(target_os = "android")]
+    let builder = builder.plugin(android_keystore::init());
+    builder
+        .setup(|app| {
+            #[cfg(target_os = "android")]
+            {
+                let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+                std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+                app_paths::init(dir);
+            }
+            let _ = app;
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            // Auth
+            check_account_exists,
+            get_login_hint,
+            get_auth_screen_mode,
+            reset_local_account,
+            sign_up,
+            log_in,
+            log_out,
+            lock_vault,
+            setup_master_password_from_legacy,
+            complete_onboarding,
+            update_user,
+            get_user,
+            // Layered unlock
+            get_unlock_info,
+            unlock_with_password,
+            unlock_with_pin,
+            unlock_with_hello,
+            hello_available,
+            unlock_with_security_key,
+            fido_available,
+            get_hardware_keys,
+            register_hardware_key,
+            test_hardware_key,
+            remove_hardware_key,
+            set_master_password,
+            set_pin,
+            remove_pin,
+            has_pin,
+            enroll_hello,
+            remove_unlock_method,
+            set_biometric_settings,
+            // Session Management
+            get_session_history,
+            revoke_session,
+            revoke_all_sessions,
+            // Stealth Mode
+            set_stealth_mode,
+            get_stealth_mode,
+            // Theme Selection
+            set_theme,
+            get_theme,
+            // Templates
+            get_templates,
+            create_entry_from_template,
+            // Command Palette
+            get_command_palette_items,
+            // Password Health Dashboard
+            get_password_health,
+            // Custom TOTP Parameters
+            update_custom_totp_params,
+            // HOTP Support
+            enable_hotp,
+            disable_hotp,
+            increment_hotp_counter,
+            // Timezone & Clock Sync
+            set_timezone_offset,
+            get_timezone_offset,
+            set_clock_drift,
+            get_clock_drift,
+            // Device Registration
+            register_device,
+            sync_device,
+            // Statistics
+            get_usage_statistics,
+            // Encrypted backup
+            export_backup,
+            restore_backup,
+            // Vault
+            add_vault_entry,
+            remove_vault_entry,
+            update_vault_entry,
+            get_vault_entries,
+            reveal_entry_secret,
+            reveal_entry_notes,
+            get_vault_entries_page,
+            get_vault_entry_count,
+            // TOTP
+            generate_otp,
+            verify_otp,
+            generate_totp_secret,
+            get_provisioning_uri,
+            // Devices
+            get_devices,
+            add_device,
+            remove_device,
+            update_device_trust,
+            // Sessions
+            get_sessions,
+            revoke_session,
+            revoke_all_sessions,
+            // Security
+            get_security_events,
+            add_security_event,
+            get_security_score,
+            // Settings
+            get_settings,
+            update_settings,
+            // Account
+            rotate_vault_key,
+            delete_account_cmd,
+            export_vault,
+            // Security Questions
+            get_security_questions,
+            get_enrolled_security_questions,
+            get_random_security_questions,
+            enroll_security_answers,
+            verify_security_answers,
+            verify_security_answers_for_reset,
+            reset_password_with_security_answers,
+            has_security_questions,
+            // Account recovery codes (preferred over security questions)
+            generate_account_recovery_codes,
+            regenerate_account_recovery_codes,
+            has_account_recovery_codes,
+            unused_account_recovery_codes_count,
+            verify_recovery_code_for_reset,
+            reset_password_with_recovery_code,
+            // Password Generator
+            generate_password,
+            generate_passphrase,
+            check_password_strength,
+            // Import/Export
+            import_otpauth_uri,
+            import_google_authenticator,
+            import_authy_csv,
+            import_manual_entry,
+            // Search & Filters
+            search_vault_entries,
+            filter_vault_entries_by_category,
+            filter_vault_entries_by_tags,
+            get_favorite_entries,
+            toggle_entry_favorite,
+            update_entry_tags,
+            // Emergency Access Codes
+            generate_emergency_codes,
+            get_emergency_codes,
+            use_emergency_code,
+            has_emergency_codes,
+            // Security Audit
+            run_security_audit,
+            check_pwned_password,
+            // Auto-Lock Timer
+            set_auto_lock,
+            get_auto_lock_settings,
+            // Export Formats
+            export_vault_json,
+            export_vault_secrets_json,
+            export_vault_csv,
+            // Bulk Operations
+            bulk_delete_entries,
+            bulk_update_category,
+            bulk_add_tags,
+            bulk_remove_tags,
+            create_vault_transfer,
+            import_vault_transfer,
+            get_entry_history,
+            create_vault_share,
+            import_vault_share,
+            get_vault_shares,
+            revoke_vault_share,
+            set_language,
+            get_language,
+            list_entry_attachments,
+            add_entry_attachment,
+            remove_entry_attachment,
+            export_entry_attachment,
+            list_removable_drives,
+            export_backup_to_usb,
+            // Utility
+            get_app_version,
+            get_platform,
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running GenVault");
+}

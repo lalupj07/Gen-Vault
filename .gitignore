@@ -1,0 +1,67 @@
+node_modules/
+# Environment / secrets
+.env
+.env.*
+!.env.example
+.env.local
+.env.studio
+.env.development.local
+.env.test.local
+.env.production.local
+
+/src/generated/prisma
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+release/
+*.msi
+*.msix
+*.exe
+*.apk
+*.aab
+*.dmg
+*.AppImage
+
+# Logs / caches
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+build-log.txt
+*.tsbuildinfo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE / local agent
+.vscode/
+.idea/
+.cursor/
+.superpowers/
+*.swp
+*.swo
+
+# Tauri
+src-tauri/target/
+src-tauri/tauri.signing.json
+
+# MSIX / Store build
+store/msix/stage/
+store/msix/devcert.pfx
+store/msix/*.msix
+
+# Android signing / Gradle
+*.jks
+*.keystore
+!src-tauri/icons/**
+src-tauri/gen/android/**/build/
+src-tauri/gen/android/**/.gradle/
+local.properties
+
+# Cognito / cloud leftovers (offline product — do not commit)
+client.json
+pool.json

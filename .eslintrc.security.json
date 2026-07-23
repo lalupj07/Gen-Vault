@@ -1,0 +1,35 @@
+{
+  "extends": ["next/core-web-vitals"],
+  "rules": {
+    "no-console": ["error", { "allow": ["warn", "error"] }],
+    "no-eval": "error",
+    "no-implied-eval": "error",
+    "no-new-func": "error",
+    "no-script-url": "error",
+    "no-alert": "error",
+    "no-debugger": "error",
+    "@typescript-eslint/no-explicit-any": "warn",
+    "@typescript-eslint/no-unused-vars": ["error", { 
+      "argsIgnorePattern": "^_",
+      "varsIgnorePattern": "^_" 
+    }]
+  },
+  "overrides": [
+    {
+      "files": ["*.ts", "*.tsx"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/node_modules/**"],
+                "message": "Direct node_modules imports are not allowed"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

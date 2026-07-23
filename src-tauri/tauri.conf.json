@@ -1,0 +1,71 @@
+{
+  "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/crates/tauri-config-schema/schema.json",
+  "productName": "GenVault",
+  "version": "1.0.0",
+  "identifier": "com.genxis.genvault",
+  "build": {
+    "beforeBuildCommand": "npm run build",
+    "beforeDevCommand": "npm run dev",
+    "frontendDist": "../out",
+    "devUrl": "http://localhost:3000"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "GenVault v1.0.0 — Offline Authentication Vault",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1024,
+        "minHeight": 700,
+        "center": true,
+        "decorations": true,
+        "resizable": true,
+        "transparent": false,
+        "devtools": false
+      }
+    ],
+    "security": {
+      "csp": {
+        "default-src": "'self'",
+        "script-src": "'self'",
+        "style-src": "'self' 'unsafe-inline'",
+        "img-src": "'self' data: blob:",
+        "media-src": "'self' blob:",
+        "object-src": "'none'",
+        "font-src": "'self'",
+        "connect-src": "'self'",
+        "frame-ancestors": "'none'",
+        "base-uri": "'self'",
+        "form-action": "'self'"
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["msi", "nsis"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": "http://timestamp.digicert.com",
+      "wix": {
+        "upgradeCode": "e19bbe51-9c13-598d-b4fa-bf7836d49d84",
+        "language": "en-US"
+      }
+    },
+    "resources": [],
+    "copyright": "© 2025 GenXis Innovations. All rights reserved.",
+    "category": "Utility",
+    "shortDescription": "Offline 2FA vault with encrypted local storage",
+    "longDescription": "GenVault v1.0.0 by GenXis Innovations — offline two-factor authentication and encrypted credential management with AES-256-GCM encryption and zero-knowledge local architecture.",
+    "publisher": "GenXis Innovations",
+    "homepage": "https://www.genxisinnovation.in",
+    "licenseFile": "../LICENSE"
+  }
+}

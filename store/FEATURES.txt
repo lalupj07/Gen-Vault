@@ -1,0 +1,69 @@
+GenVault v1.0.0 — Feature List (Microsoft Store)
+=================================================
+
+PRODUCT
+- Name: GenVault
+- Version: 1.0.0
+- Publisher: GenXis Innovations
+- Tagline: Offline Authentication Vault
+
+CORE SECURITY
+- Zero-knowledge encrypted vault (master password never stored or transmitted)
+- AES-256-GCM encryption for vault data at rest
+- Argon2id key derivation for master password
+- Auto-lock after configurable idle timeout
+- Clipboard auto-clear for copied TOTP codes and passwords
+- Stealth mode to hide vault content on screen
+
+TWO-FACTOR AUTHENTICATION (2FA / TOTP)
+- Add accounts via QR code scan or manual secret entry
+- Time-based one-time password (TOTP) generation
+- Organize accounts with labels and favorites
+- Copy codes to clipboard with auto-clear
+
+PASSWORD MANAGER
+- Encrypted credential storage (username, password, URL, notes)
+- Categories and full-text search
+- Password generator with configurable length and character sets
+- Optional Have I Been Pwned (HIBP) breach check (user-initiated, k-anonymity hash prefix only)
+
+SECURE NOTES
+- Encrypted rich-text notes inside the vault
+- Search and organize notes alongside 2FA entries
+
+FILE ATTACHMENTS
+- Encrypt and store files within vault entries
+- Attachments protected by vault encryption key
+
+UNLOCK METHODS
+- Master password (required; sole secret that recovers the vault key)
+- Windows Hello / biometrics as presence confirmation (with master password)
+- FIDO2 / CTAP hardware security key (with master password)
+
+BACKUP & PORTABILITY
+- Encrypted USB backup to removable drives
+- Import / export vault data (encrypted export format)
+- No cloud sync — data stays on device by default
+
+USER EXPERIENCE
+- Interactive welcome tour after first setup (sidebar, 2FA, vault, stealth, shortcuts)
+- Modern dark-themed desktop UI
+- Keyboard shortcuts for power users
+- Onboarding wizard for first-time setup
+- In-app About, version info, and license display
+
+PRIVACY & NETWORK
+- Offline-first: all vault operations work without internet
+- No telemetry or analytics in production build
+- Optional network: HIBP password breach check only when user explicitly requests it
+- No account creation required for app use
+
+PLATFORM
+- Native Windows desktop app (Tauri + Rust backend)
+- x64 architecture
+- Requires Windows 10 1809+ or Windows 11
+- Uses Microsoft Edge WebView2 for UI rendering
+
+SUPPORT
+- Email: genxisinnovation@outlook.com
+- Website: https://www.genxisinnovation.in

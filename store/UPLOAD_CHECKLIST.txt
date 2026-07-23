@@ -1,0 +1,43 @@
+GenVault v1.0.0 — Microsoft Store Upload Checklist
+=================================================
+
+PACKAGE (required)
+[ ] dist/release/v1.0.0/GenVault_1.0.0.0_x64.msix
+
+PROPERTIES (Partner Center → Properties)
+[ ] store/PROPERTIES.md             — categories, privacy Yes + URL, contact, no MR
+[ ] Phone + postal address          — enter your GenXis business details (not in repo)
+
+STORE LISTING COPY
+[ ] store/STORE_LISTING.md          — description, keywords, short text
+[ ] store/FEATURES.txt              — feature bullet list
+
+CERTIFICATION
+[ ] store/CERTIFICATION_NOTES.md    — paste into "Notes for certification"
+
+STORE ASSETS (Partner Center → Store listings)
+[ ] store/msix/Assets/Square310x310Logo.png   — 310×310 tile
+[ ] store/msix/Assets/Wide310x150Logo.png     — 310×150 hero tile
+[ ] Screenshots (1366×768 or 1920×1080)       — capture from running app
+
+BEFORE UPLOAD — UPDATE MANIFEST
+[ ] store/msix/Package.appxmanifest
+      Identity@Name      → Partner Center package identity name
+      Identity@Publisher → Partner Center publisher CN (exact match)
+
+REBUILD AFTER MANIFEST UPDATE
+    npm run build:msix
+
+PARTNER CENTER STEPS
+1. Create / open app in https://partner.microsoft.com/
+2. Reserve app name: GenVault
+3. Properties → fill from store/PROPERTIES.md (privacy = Yes + URL)
+4. Packages → upload GenVault_1.0.0.0_x64.msix
+5. Store listing → paste content from STORE_LISTING.md
+6. Features → attach FEATURES.txt if requested
+7. Certification → paste CERTIFICATION_NOTES.md
+8. Privacy policy live at: https://www.genxisinnovation.in
+9. Submit for certification
+
+SUPPORT
+    genxisinnovation@outlook.com
