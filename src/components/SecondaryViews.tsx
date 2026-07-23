@@ -1844,6 +1844,18 @@ export function SettingsView({ onReplayWelcomeTour }: { onReplayWelcomeTour?: ()
         <h3 className="text-sm font-medium text-vault-light mb-4">About {PRODUCT.name}</h3>
         <div className="text-[11px] text-vault-muted space-y-2">
           <p className="text-sm text-cyber-cyan/90 font-medium">{PRODUCT.tagline}</p>
+          <p>
+            <a
+              href={COMPANY.microsoftStoreUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-cyber-cyan hover:underline"
+            >
+              Download on Microsoft Store
+            </a>
+            {' · '}
+            <span>{COMPANY.playStoreLabel}</span>
+          </p>
           {onReplayWelcomeTour && (
             <button
               type="button"
