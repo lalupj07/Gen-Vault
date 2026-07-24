@@ -5,6 +5,7 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
+  workflow_dispatch:
 
 concurrency:
   group: build-test-${{ github.ref }}
@@ -98,16 +99,20 @@ jobs:
 
       - name: Run cargo tests
         working-directory: src-tauri
-        env:
-          # runner.* is only valid in step env/with — never job/workflow env
-          CARGO_TARGET_DIR: ${{ runner.temp }}/genvault-cargo-target
         run: |
           set -euxo pipefail
-          rm -f .cargo/config.toml .cargo/config
-          mkdir -p "$CARGO_TARGET_DIR"
-          LOG="$RUNNER_TEMP/cargo-lib-test.log"
+          # Strip any local Windows Cargo override (must never be committed)
+          rm -rf .cargo
+          # Hard-coded Linux path — never C:/... (breaks LD_LIBRARY_PATH)
+          TARGET="/tmp/genvault-ci-target"
+          rm -rf "$TARGET"
+          mkdir -p "$TARGET"
+          export CARGO_TARGET_DIR="$TARGET"
+          unset LD_LIBRARY_PATH || true
+
+          LOG="/tmp/genvault-cargo-test.log"
           set +e
-          cargo test --locked --target-dir "$CARGO_TARGET_DIR" \
+          cargo test --locked --target-dir "$TARGET" \
             --test e2e_smoke \
             --test crypto_test \
             --test recovery_codes_test \
@@ -115,16 +120,17 @@ jobs:
             -- --nocapture --test-threads=1 >"$LOG" 2>&1
           status=$?
           set -e
+
           if [ "$status" -ne 0 ]; then
             {
               echo "### cargo test failed (exit $status)"
               echo '```'
-              grep -E 'FAILED|failures:|error:|panicked at|LD_LIBRARY|test result:' "$LOG" || true
+              grep -E 'FAILED|failures:|error:|panicked at|LD_LIBRARY|GenVaultBuild|test result:' "$LOG" || true
               echo '---'
               tail -n 80 "$LOG"
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
-            grep -E 'FAILED|failures:|error:|panicked at|LD_LIBRARY' "$LOG" | tail -n 20 | while IFS= read -r line; do
+            grep -E 'FAILED|failures:|error:|panicked at|LD_LIBRARY|GenVaultBuild' "$LOG" | tail -n 20 | while IFS= read -r line; do
               echo "::error::${line}"
             done
             exit "$status"
@@ -136,7 +142,7 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: rust-test-log
-          path: ${{ runner.temp }}/cargo-lib-test.log
+          path: /tmp/genvault-cargo-test.log
           if-no-files-found: ignore
 
   e2e-smoke:
@@ -174,14 +180,17 @@ jobs:
 
       - name: Run E2E smoke tests
         env:
-          GENVAULT_DATA_DIR: ${{ runner.temp }}/genvault-e2e
-          CARGO_TARGET_DIR: ${{ runner.temp }}/genvault-cargo-target
+          GENVAULT_DATA_DIR: /tmp/genvault-e2e
         run: |
           set -euxo pipefail
-          rm -f src-tauri/.cargo/config.toml src-tauri/.cargo/config
-          mkdir -p "$CARGO_TARGET_DIR"
+          rm -rf src-tauri/.cargo
+          TARGET="/tmp/genvault-ci-target"
+          rm -rf "$TARGET"
+          mkdir -p "$TARGET"
+          export CARGO_TARGET_DIR="$TARGET"
+          unset LD_LIBRARY_PATH || true
           npx jest --runTestsByPath src/tests/e2e.smoke.test.ts --verbose
           cargo test --locked --manifest-path src-tauri/Cargo.toml \
-            --target-dir "$CARGO_TARGET_DIR" \
+            --target-dir "$TARGET" \
             --test e2e_smoke \
             -- --test-threads=1
