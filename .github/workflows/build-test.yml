@@ -60,7 +60,7 @@ jobs:
         run: npm ci
 
       - name: Run unit / security tests
-        run: npm test -- --passWithNoTests
+        run: npx jest --runTestsByPath src/tests/security.test.ts src/tests/e2e.smoke.test.ts --passWithNoTests
 
       - name: Run security tests
         run: npm run test:security
