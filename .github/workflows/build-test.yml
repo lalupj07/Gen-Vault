@@ -93,33 +93,41 @@ jobs:
         working-directory: src-tauri
         env:
           CARGO_TARGET_DIR: ${{ runner.temp }}/genvault-cargo-target
+          CARGO_TERM_COLOR: never
         run: |
           set -euxo pipefail
           rm -f .cargo/config.toml .cargo/config
           mkdir -p "$CARGO_TARGET_DIR"
-          {
-            echo "### Cargo diagnostics"
-            echo "CARGO_TARGET_DIR=$CARGO_TARGET_DIR"
-            cargo config get build.target-dir || true
-            echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-}"
-          } | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "CARGO_TARGET_DIR=$CARGO_TARGET_DIR" >> "$GITHUB_STEP_SUMMARY"
 
-          # Integration tests link the lib as a normal dependency (cfg(test) off).
-          # Prefer --tests: Tauri cdylib/staticlib + cargo test --lib often breaks on Linux.
-          if ! cargo test --locked --tests --target-dir "$CARGO_TARGET_DIR" -- --nocapture 2>&1 | tee "$RUNNER_TEMP/cargo-lib-test.log"; then
+          LOG="$RUNNER_TEMP/cargo-lib-test.log"
+          # Explicit integration targets only (same surface as local e2e + crypto/recovery).
+          # Avoid bare `cargo test --lib`: Tauri cdylib/staticlib harness is flaky on Linux CI.
+          set +e
+          cargo test --locked --target-dir "$CARGO_TARGET_DIR" \
+            --test e2e_smoke \
+            --test crypto_test \
+            --test recovery_codes_test \
+            --test android_backup_roundtrip \
+            -- --nocapture --test-threads=1 >"$LOG" 2>&1
+          status=$?
+          set -e
+
+          if [ "$status" -ne 0 ]; then
             {
-              echo ""
-              echo "### cargo test failure (last 120 lines)"
+              echo "### cargo test failed (exit $status)"
               echo '```'
-              tail -n 120 "$RUNNER_TEMP/cargo-lib-test.log"
+              grep -E 'FAILED|failures:|error:|panicked at|LD_LIBRARY|test result:' "$LOG" || true
+              echo '---'
+              tail -n 80 "$LOG"
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
-            # Surface last error lines in the Checks UI
-            tail -n 30 "$RUNNER_TEMP/cargo-lib-test.log" | while IFS= read -r line; do
+            grep -E 'FAILED|failures:|error:|panicked at|LD_LIBRARY' "$LOG" | tail -n 20 | while IFS= read -r line; do
               echo "::error::${line}"
             done
-            exit 1
+            exit "$status"
           fi
+          grep -E 'test result:' "$LOG" >> "$GITHUB_STEP_SUMMARY" || true
 
       - name: Upload cargo test log
         if: failure()
