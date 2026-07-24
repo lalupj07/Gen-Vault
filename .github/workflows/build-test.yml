@@ -97,9 +97,29 @@ jobs:
           set -euxo pipefail
           rm -f .cargo/config.toml .cargo/config
           mkdir -p "$CARGO_TARGET_DIR"
-          echo "CARGO_TARGET_DIR=$CARGO_TARGET_DIR"
-          cargo config get build.target-dir || true
-          cargo test --locked --lib --target-dir "$CARGO_TARGET_DIR" -- --nocapture 2>&1 | tee "$RUNNER_TEMP/cargo-lib-test.log"
+          {
+            echo "### Cargo diagnostics"
+            echo "CARGO_TARGET_DIR=$CARGO_TARGET_DIR"
+            cargo config get build.target-dir || true
+            echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-}"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+          # Integration tests link the lib as a normal dependency (cfg(test) off).
+          # Prefer --tests: Tauri cdylib/staticlib + cargo test --lib often breaks on Linux.
+          if ! cargo test --locked --tests --target-dir "$CARGO_TARGET_DIR" -- --nocapture 2>&1 | tee "$RUNNER_TEMP/cargo-lib-test.log"; then
+            {
+              echo ""
+              echo "### cargo test failure (last 120 lines)"
+              echo '```'
+              tail -n 120 "$RUNNER_TEMP/cargo-lib-test.log"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            # Surface last error lines in the Checks UI
+            tail -n 30 "$RUNNER_TEMP/cargo-lib-test.log" | while IFS= read -r line; do
+              echo "::error::${line}"
+            done
+            exit 1
+          fi
 
       - name: Upload cargo test log
         if: failure()
