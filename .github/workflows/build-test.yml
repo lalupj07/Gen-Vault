@@ -91,7 +91,12 @@ jobs:
 
       - name: Run cargo tests
         working-directory: src-tauri
-        run: cargo test --locked --lib -- --nocapture
+        env:
+          # Override any Windows-only target-dir (local .cargo/config.toml must never affect CI)
+          CARGO_TARGET_DIR: ${{ runner.temp }}/genvault-cargo-target
+        run: |
+          rm -f .cargo/config.toml
+          cargo test --locked --lib -- --nocapture
 
   e2e-smoke:
     name: E2E Smoke Tests
@@ -127,6 +132,9 @@ jobs:
         run: npm ci
 
       - name: Run E2E smoke tests
-        run: npm run test:e2e
+        run: |
+          rm -f src-tauri/.cargo/config.toml
+          npm run test:e2e
         env:
           GENVAULT_DATA_DIR: ${{ runner.temp }}/genvault-e2e
+          CARGO_TARGET_DIR: ${{ runner.temp }}/genvault-cargo-target

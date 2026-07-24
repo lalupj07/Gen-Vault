@@ -1,5 +1,7 @@
 # Optional local Cargo overrides (not committed).
-# Copy to config.toml on Windows if the default target/ path is too long:
+# Copy to config.toml on Windows if the default target/ path is too long, e.g.:
 #
 #   [build]
-#   target-dir = "C:/GenVaultBuild/target"
+#   target-dir = "C:/cargo-targets/genvault"
+#
+# Never commit config.toml — Linux CI cannot use Windows drive paths.
