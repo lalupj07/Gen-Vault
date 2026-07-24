@@ -1,0 +1,5 @@
+# Optional local Cargo overrides (not committed).
+# Copy to config.toml on Windows if the default target/ path is too long:
+#
+#   [build]
+#   target-dir = "C:/GenVaultBuild/target"
