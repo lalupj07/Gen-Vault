@@ -75,9 +75,6 @@ jobs:
   rust-test:
     name: Rust Tests
     runs-on: ubuntu-latest
-    env:
-      # Pin Linux target dir — Windows C:/… paths poison LD_LIBRARY_PATH on runners
-      CARGO_TARGET_DIR: ${{ runner.temp }}/genvault-cargo-target
 
     steps:
       - name: Checkout code
@@ -101,16 +98,13 @@ jobs:
 
       - name: Run cargo tests
         working-directory: src-tauri
+        env:
+          # runner.* is only valid in step env/with — never job/workflow env
+          CARGO_TARGET_DIR: ${{ runner.temp }}/genvault-cargo-target
         run: |
           set -euxo pipefail
           rm -f .cargo/config.toml .cargo/config
           mkdir -p "$CARGO_TARGET_DIR"
-          if cargo config get build.target-dir 2>/dev/null | grep -E '[A-Za-z]:[/\\]'; then
-            echo "::error::Windows drive path in Cargo target-dir — remove src-tauri/.cargo/config.toml from the repo"
-            cargo config get build.target-dir || true
-            exit 1
-          fi
-
           LOG="$RUNNER_TEMP/cargo-lib-test.log"
           set +e
           cargo test --locked --target-dir "$CARGO_TARGET_DIR" \
@@ -121,7 +115,6 @@ jobs:
             -- --nocapture --test-threads=1 >"$LOG" 2>&1
           status=$?
           set -e
-
           if [ "$status" -ne 0 ]; then
             {
               echo "### cargo test failed (exit $status)"
@@ -149,8 +142,6 @@ jobs:
   e2e-smoke:
     name: E2E Smoke Tests
     runs-on: ubuntu-latest
-    env:
-      CARGO_TARGET_DIR: ${{ runner.temp }}/genvault-cargo-target
 
     steps:
       - name: Checkout code
@@ -184,6 +175,7 @@ jobs:
       - name: Run E2E smoke tests
         env:
           GENVAULT_DATA_DIR: ${{ runner.temp }}/genvault-e2e
+          CARGO_TARGET_DIR: ${{ runner.temp }}/genvault-cargo-target
         run: |
           set -euxo pipefail
           rm -f src-tauri/.cargo/config.toml src-tauri/.cargo/config
