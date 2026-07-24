@@ -92,11 +92,22 @@ jobs:
       - name: Run cargo tests
         working-directory: src-tauri
         env:
-          # Override any Windows-only target-dir (local .cargo/config.toml must never affect CI)
           CARGO_TARGET_DIR: ${{ runner.temp }}/genvault-cargo-target
         run: |
-          rm -f .cargo/config.toml
-          cargo test --locked --lib -- --nocapture
+          set -euxo pipefail
+          rm -f .cargo/config.toml .cargo/config
+          mkdir -p "$CARGO_TARGET_DIR"
+          echo "CARGO_TARGET_DIR=$CARGO_TARGET_DIR"
+          cargo config get build.target-dir || true
+          cargo test --locked --lib --target-dir "$CARGO_TARGET_DIR" -- --nocapture 2>&1 | tee "$RUNNER_TEMP/cargo-lib-test.log"
+
+      - name: Upload cargo test log
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: rust-test-log
+          path: ${{ runner.temp }}/cargo-lib-test.log
+          if-no-files-found: ignore
 
   e2e-smoke:
     name: E2E Smoke Tests
