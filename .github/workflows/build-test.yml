@@ -11,8 +11,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Never inherit a Windows drive path (e.g. C:/GenVaultBuild) into Linux LD_LIBRARY_PATH
-  CARGO_TARGET_DIR: ${{ runner.temp }}/genvault-cargo-target
   CARGO_TERM_COLOR: never
 
 jobs:
@@ -77,6 +75,9 @@ jobs:
   rust-test:
     name: Rust Tests
     runs-on: ubuntu-latest
+    env:
+      # Pin Linux target dir — Windows C:/… paths poison LD_LIBRARY_PATH on runners
+      CARGO_TARGET_DIR: ${{ runner.temp }}/genvault-cargo-target
 
     steps:
       - name: Checkout code
@@ -104,7 +105,6 @@ jobs:
           set -euxo pipefail
           rm -f .cargo/config.toml .cargo/config
           mkdir -p "$CARGO_TARGET_DIR"
-          # Guard: abort early if any Windows drive target-dir is still configured
           if cargo config get build.target-dir 2>/dev/null | grep -E '[A-Za-z]:[/\\]'; then
             echo "::error::Windows drive path in Cargo target-dir — remove src-tauri/.cargo/config.toml from the repo"
             cargo config get build.target-dir || true
@@ -149,6 +149,8 @@ jobs:
   e2e-smoke:
     name: E2E Smoke Tests
     runs-on: ubuntu-latest
+    env:
+      CARGO_TARGET_DIR: ${{ runner.temp }}/genvault-cargo-target
 
     steps:
       - name: Checkout code
