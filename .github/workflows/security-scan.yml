@@ -13,6 +13,8 @@ jobs:
   dependency-scan:
     name: Dependency Vulnerability Scan
     runs-on: ubuntu-latest
+    env:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
     
     steps:
       - name: Checkout code
@@ -33,9 +35,7 @@ jobs:
       
       - name: Run Snyk security scan
         uses: snyk/actions/node@master
-        if: ${{ secrets.SNYK_TOKEN != '' }}
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        if: ${{ env.SNYK_TOKEN != '' }}
         with:
           args: --severity-threshold=high
   
@@ -102,7 +102,7 @@ jobs:
           output: 'trivy-results.sarif'
       
       - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         if: hashFiles('Dockerfile') != ''
         with:
           sarif_file: 'trivy-results.sarif'
@@ -128,7 +128,7 @@ jobs:
           echo "- Secret Scan: ${{ needs.secret-scan.result }}" >> security-report.md
       
       - name: Upload security report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: security-report
           path: security-report.md
