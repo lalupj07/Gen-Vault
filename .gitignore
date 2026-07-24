@@ -66,3 +66,11 @@ local.properties
 # Cognito / cloud leftovers (offline product — do not commit)
 client.json
 pool.json
+credentials.json
+secrets/
+**/key.properties
+*.p8
+*.p12
+*.mobileprovision
+*.snk
+*.cer

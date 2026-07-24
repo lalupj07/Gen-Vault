@@ -56,18 +56,9 @@ npm ci
 
 ### 3. Environment Configuration
 ```powershell
-# Create production .env.local (DO NOT COMMIT)
-cp .env.example .env.local
-
-# Configure production values:
-# - NEXT_PUBLIC_COGNITO_USER_POOL_ID
-# - NEXT_PUBLIC_COGNITO_CLIENT_ID
-# - NEXT_PUBLIC_COGNITO_REGION
-# - COGNITO_CLIENT_SECRET
-# - DATABASE_URL
-# - RESEND_API_KEY
-# - UPSTASH_REDIS_REST_URL
-# - UPSTASH_REDIS_REST_TOKEN
+# Offline product — no Cognito / database / Redis secrets required.
+# Optional: copy .env.example to .env.local only for local path overrides.
+# Never commit .env, .env.local, keystores, or signing private keys.
 ```
 
 ---
@@ -301,12 +292,11 @@ Get-FileHash GenVault_1.0.0_x64-setup.exe -Algorithm SHA256 | Format-List
 # GenVault v1.0.0 Beta Release
 
 ## 🎯 Highlights
-- Enterprise-grade security (10/10 score)
-- AWS Cognito authentication
-- Zero-knowledge architecture
-- Military-grade AES-256 encryption
-- Comprehensive audit logging
-- Production-ready architecture
+- Offline vault (no cloud account)
+- AES-256-GCM + Argon2id
+- TOTP / HOTP authenticator
+- Windows Hello / Android biometrics
+- Encrypted backup & recovery codes
 
 ## 📥 Downloads
 - MSI Installer (Recommended for Enterprise)
@@ -322,7 +312,7 @@ Get-FileHash GenVault_1.0.0_x64-setup.exe -Algorithm SHA256 | Format-List
 - Windows 10/11 (x64)
 - 4GB RAM minimum
 - 500MB disk space
-- Internet connection (for cloud sync)
+- No internet required for vault use
 
 ## 🐛 Known Issues
 - None reported
