@@ -1,6 +1,10 @@
 // Jest setup file
 // Add any global test setup here
 
+if (typeof structuredClone === 'undefined') {
+  global.structuredClone = (val) => JSON.parse(JSON.stringify(val));
+}
+
 // Add TextEncoder/TextDecoder for Node.js environment
 const { TextEncoder, TextDecoder } = require('util');
 global.TextEncoder = TextEncoder;
