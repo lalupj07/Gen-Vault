@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { analyzeOtpauthUri, otpauthBlocked } from '@/lib/otpauth-safety';
+import { isDemoMode } from '@/lib/demo/flag';
 
 interface Props {
   onImported?: () => void;
@@ -67,7 +68,8 @@ export default function MobileImport({ onImported }: Props) {
   return (
     <div className="space-y-4">
       <p className="text-xs text-vault-muted">
-        Import offline from otpauth URIs, Google Authenticator export JSON, or Authy CSV. Secrets stay on device.
+        Import offline from otpauth URIs, Google Authenticator export JSON, or Authy CSV. Secrets stay on device
+        {isDemoMode() ? ' in this browser demo (not production encryption).' : '.'}
       </p>
 
       <div className="flex gap-1 p-1 rounded-2xl bg-vault-black border border-vault-border">

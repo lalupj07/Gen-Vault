@@ -282,8 +282,10 @@ export function VaultView() {
             <Shield className="w-5 h-5 text-cyber-emerald" />
             <span className="text-sm font-medium text-vault-light">Integrity Check</span>
           </div>
-          <div className="text-2xl font-bold text-cyber-emerald mb-1">Verified</div>
-          <p className="text-[11px] text-vault-muted">SHA-384 hash verified at boot</p>
+          <div className="text-2xl font-bold text-cyber-emerald mb-1">{isDemoMode() ? 'Demo' : 'Verified'}</div>
+          <p className="text-[11px] text-vault-muted">
+            {isDemoMode() ? 'Integrity checks not available in demo' : 'SHA-384 hash verified at boot'}
+          </p>
         </GlassCard>
       </div>
 
@@ -684,7 +686,9 @@ export function QROnboardView() {
             ) : (
               <QrCode className="w-24 h-24 text-vault-muted/30" />
             )}
-            <p className="text-[11px] text-vault-muted mt-3 text-center">AES-256-GCM encrypted payload</p>
+            <p className="text-[11px] text-vault-muted mt-3 text-center">
+              {isDemoMode() ? 'Demo transfer payload (not production encryption)' : 'AES-256-GCM encrypted payload'}
+            </p>
           </GlassCard>
         </div>
       ) : (
@@ -1835,16 +1839,28 @@ export function SettingsView({ onReplayWelcomeTour }: { onReplayWelcomeTour?: ()
       <ThemeSelector />
 
       <GlassCard>
-        <h3 className="text-sm font-medium text-vault-light mb-4">Cryptographic Configuration</h3>
+        <h3 className="text-sm font-medium text-vault-light mb-4">
+          {isDemoMode() ? 'Demo Configuration' : 'Cryptographic Configuration'}
+        </h3>
         <div className="grid grid-cols-2 gap-3 text-[11px]">
-          {[
-            { label: 'Symmetric Cipher', value: 'AES-256-GCM' },
-            { label: 'OTP Algorithm', value: 'HMAC-SHA-1 (TOTP/HOTP)' },
-            { label: 'Key Derivation', value: 'Argon2id (m=19456, t=3, p=4)' },
-            { label: 'Integrity', value: 'AES-GCM auth tag' },
-            { label: 'Secrets at rest', value: 'Encrypted vault blob only' },
-            { label: 'Session key', value: 'In-memory VMK (zeroized on lock)' },
-          ].map((config, i) => (
+          {(isDemoMode()
+            ? [
+                { label: 'Mode', value: 'Browser demo' },
+                { label: 'OTP Algorithm', value: 'HMAC-SHA-1 (TOTP/HOTP)' },
+                { label: 'Storage', value: 'localStorage (demo)' },
+                { label: 'Encryption', value: 'Not enabled' },
+                { label: 'Secrets at rest', value: 'Plaintext in demo' },
+                { label: 'Session key', value: 'N/A in demo' },
+              ]
+            : [
+                { label: 'Symmetric Cipher', value: 'AES-256-GCM' },
+                { label: 'OTP Algorithm', value: 'HMAC-SHA-1 (TOTP/HOTP)' },
+                { label: 'Key Derivation', value: 'Argon2id (m=19456, t=3, p=4)' },
+                { label: 'Integrity', value: 'AES-GCM auth tag' },
+                { label: 'Secrets at rest', value: 'Encrypted vault blob only' },
+                { label: 'Session key', value: 'In-memory VMK (zeroized on lock)' },
+              ]
+          ).map((config, i) => (
             <div key={i} className="flex justify-between p-3 rounded-xl bg-vault-black/30 border border-vault-border/20">
               <span className="text-vault-muted">{config.label}</span>
               <span className="text-vault-light font-mono">{config.value}</span>

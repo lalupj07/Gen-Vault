@@ -9,6 +9,7 @@ import {
 import { cn } from '@/lib/utils';
 import RecoveryCodesSetup from './RecoveryCodesSetup';
 import { COMPANY, PRODUCT } from '@/lib/company';
+import { isDemoMode } from '@/lib/demo/flag';
 
 interface OnboardingProps {
   onComplete: () => void;
@@ -106,9 +107,38 @@ export default function OnboardingFlow({ onComplete }: OnboardingProps) {
   const [loading, setLoading] = useState(false);
   const [showRecoveryCodes, setShowRecoveryCodes] = useState(false);
 
-  const step = steps[currentStep];
+  const demo = isDemoMode();
+  const activeSteps = demo
+    ? steps.map((s) => {
+        if (s.id === 'welcome') {
+          return {
+            ...s,
+            subtitle: 'Browser Demo Experience',
+            description: `Explore GenVault in your browser. This demo stores data locally and does not use production encryption.`,
+          };
+        }
+        if (s.id === 'encryption') {
+          return {
+            ...s,
+            title: 'Local Demo Storage',
+            subtitle: 'Browser-only demo vault',
+            description: 'Demo data stays in your browser without AES-256-GCM or Argon2id. For production security, use the desktop app.',
+          };
+        }
+        if (s.id === 'ready') {
+          return {
+            ...s,
+            subtitle: 'Your Demo Vault is Ready',
+            description: 'Demo systems are initialized. Next, a short welcome tour will guide you through the interface.',
+          };
+        }
+        return s;
+      })
+    : steps;
+
+  const step = activeSteps[currentStep];
   const Icon = step.icon;
-  const isLast = currentStep === steps.length - 1;
+  const isLast = currentStep === activeSteps.length - 1;
 
   const handleNext = () => {
     if (step.id === 'recovery_codes') {
@@ -149,7 +179,7 @@ export default function OnboardingFlow({ onComplete }: OnboardingProps) {
       <div className="relative z-10 max-w-lg w-full mx-auto px-6 pb-10">
         {/* Progress */}
         <div className="flex items-center gap-2 mb-12 justify-center">
-          {steps.map((s, i) => (
+          {activeSteps.map((s, i) => (
             <motion.div
               key={s.id}
               className="h-1 rounded-full overflow-hidden"
@@ -254,11 +284,18 @@ export default function OnboardingFlow({ onComplete }: OnboardingProps) {
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.5 }}
               >
-                {[
-                  { icon: Cpu, label: 'AES-256-GCM' },
-                  { icon: Key, label: 'Argon2id' },
-                  { icon: Zap, label: 'TOTP' },
-                ].map((item, i) => (
+                {(demo
+                  ? [
+                      { icon: Cpu, label: 'Browser demo' },
+                      { icon: Key, label: 'Local only' },
+                      { icon: Zap, label: 'TOTP' },
+                    ]
+                  : [
+                      { icon: Cpu, label: 'AES-256-GCM' },
+                      { icon: Key, label: 'Argon2id' },
+                      { icon: Zap, label: 'TOTP' },
+                    ]
+                ).map((item, i) => (
                   <div
                     key={i}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/[0.03] border border-vault-border/30"

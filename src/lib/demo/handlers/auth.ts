@@ -1,9 +1,9 @@
 import type { User, UnlockInfo } from '@/lib/api';
+import { VAULT_ERASE_CONFIRMATION } from '@/lib/vault-reset';
 import { hashPassword, verifyPassword } from '../crypto';
 import { resetDemo } from '../store';
 import type { DemoHandler, DemoState } from '../types';
 
-const VAULT_ERASE_CONFIRMATION = 'DELETE MY VAULT';
 const APP_VERSION = '1.5.0-demo';
 
 function nowTs(): number {

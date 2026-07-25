@@ -198,7 +198,7 @@ export default function Dashboard({ appState, vaultEntries }: DashboardProps) {
           <MetricCard icon={Smartphone} label="Trusted Devices" value={appState.activeDevices} subtext="Verified" color="emerald" />
           <MetricCard icon={Shield} label="Security Score" value={`${appState.securityScore}%`} subtext="Fortress" color="purple" />
           <MetricCard icon={Activity} label="Active Sessions" value={2} subtext="Monitored" color="blue" />
-          <MetricCard icon={Database} label="Vault Integrity" value="Verified" subtext="SHA-384" color="emerald" />
+          <MetricCard icon={Database} label="Vault Integrity" value={isDemoMode() ? 'Demo' : 'Verified'} subtext={isDemoMode() ? 'Not verified' : 'SHA-384'} color="emerald" />
           <MetricCard icon={Timer} label="OTP Cycle" value={`${seconds}s`} subtext={`${Math.round(100 - progress)}%`} color="amber" />
         </div>
       </div>
@@ -210,19 +210,24 @@ export default function Dashboard({ appState, vaultEntries }: DashboardProps) {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Zap className="w-4 h-4 text-cyber-cyan" />
-              <span className="text-sm font-medium text-vault-light">Encryption Activity</span>
+              <span className="text-sm font-medium text-vault-light">
+                {isDemoMode() ? 'Demo Activity' : 'Encryption Activity'}
+              </span>
             </div>
-            <StatusBadge status="active" label="Live" />
+            <StatusBadge status="active" label={isDemoMode() ? 'Demo' : 'Live'} />
           </div>
-          <EncryptionActivity />
+          {!isDemoMode() && <EncryptionActivity />}
+          {isDemoMode() && (
+            <p className="text-[11px] text-vault-muted py-2">Demo mode — encryption metrics are not available.</p>
+          )}
           <div className="mt-4 grid grid-cols-2 gap-3">
             <div className="glass-light rounded-xl p-3">
-              <div className="text-[10px] text-vault-muted mb-1">Encrypt Operations</div>
-              <div className="text-lg font-bold text-cyber-cyan">2,847</div>
+              <div className="text-[10px] text-vault-muted mb-1">{isDemoMode() ? 'Encrypt Ops' : 'Encrypt Operations'}</div>
+              <div className="text-lg font-bold text-cyber-cyan">{isDemoMode() ? '—' : '2,847'}</div>
             </div>
             <div className="glass-light rounded-xl p-3">
-              <div className="text-[10px] text-vault-muted mb-1">Decrypt Operations</div>
-              <div className="text-lg font-bold text-cyber-emerald">1,203</div>
+              <div className="text-[10px] text-vault-muted mb-1">{isDemoMode() ? 'Decrypt Ops' : 'Decrypt Operations'}</div>
+              <div className="text-lg font-bold text-cyber-emerald">{isDemoMode() ? '—' : '1,203'}</div>
             </div>
           </div>
         </motion.div>
@@ -272,13 +277,22 @@ export default function Dashboard({ appState, vaultEntries }: DashboardProps) {
             <span className="text-sm font-medium text-vault-light">Infrastructure</span>
           </div>
           <div className="space-y-3">
-            {[
-              { label: 'TPM Module', status: 'Connected', icon: HardDrive, ok: true },
-              { label: 'Secure Enclave', status: 'Isolated', icon: Lock, ok: true },
-              { label: 'FIDO2 Key', status: 'Ready', icon: Fingerprint, ok: true },
-              { label: 'Cloud Sync', status: appState.syncStatus === 'synced' ? 'Synced' : 'Pending', icon: Cloud, ok: appState.syncStatus === 'synced' },
-              { label: 'Anti-Tamper', status: 'Active', icon: Shield, ok: true },
-            ].map((item, i) => (
+            {(isDemoMode()
+              ? [
+                  { label: 'Browser Storage', status: 'Local', icon: HardDrive, ok: true },
+                  { label: 'Demo Mode', status: 'Active', icon: Lock, ok: true },
+                  { label: 'Hardware Keys', status: 'N/A', icon: Fingerprint, ok: false },
+                  { label: 'Cloud Sync', status: 'Disabled', icon: Cloud, ok: false },
+                  { label: 'Production Crypto', status: 'Not enabled', icon: Shield, ok: false },
+                ]
+              : [
+                  { label: 'TPM Module', status: 'Connected', icon: HardDrive, ok: true },
+                  { label: 'Secure Enclave', status: 'Isolated', icon: Lock, ok: true },
+                  { label: 'FIDO2 Key', status: 'Ready', icon: Fingerprint, ok: true },
+                  { label: 'Cloud Sync', status: appState.syncStatus === 'synced' ? 'Synced' : 'Pending', icon: Cloud, ok: appState.syncStatus === 'synced' },
+                  { label: 'Anti-Tamper', status: 'Active', icon: Shield, ok: true },
+                ]
+            ).map((item, i) => (
               <div key={i} className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <item.icon className="w-3.5 h-3.5 text-vault-muted" />

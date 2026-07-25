@@ -1,4 +1,4 @@
-// GenVault Backend API Bridge — Tauri IPC only (no insecure browser fallback)
+// GenVault Backend API Bridge — Tauri IPC, or gated demo mode when NEXT_PUBLIC_GENVAULT_DEMO=true
 
 import { isDemoMode } from './demo/flag';
 import { generateTotpCode, verifyTotpCode, generateTotpSecret } from './totp-browser';

@@ -3,13 +3,17 @@ import { hashPassword } from './crypto';
 
 export const SEED_PASSWORD = 'DemoVault1!';
 
+function nowTs(): number {
+  return Math.floor(Date.now() / 1000);
+}
+
 function entry(
   partial: Omit<DemoVaultEntry, 'created_at' | 'last_used' | 'digits' | 'period'> & {
     digits?: number;
     period?: number;
   },
 ): DemoVaultEntry {
-  const now = Date.now();
+  const now = nowTs();
   return {
     digits: 6,
     period: 30,
@@ -22,7 +26,7 @@ function entry(
 }
 
 export async function createSeedState(): Promise<DemoState> {
-  const now = Math.floor(Date.now() / 1000);
+  const now = nowTs();
   const passwordHash = await hashPassword(SEED_PASSWORD);
   const entries: DemoVaultEntry[] = [
     entry({ id: 'e1', name: 'Demo GitHub', issuer: 'GitHub', category: 'Work', icon: '🔑', color: '#8b5cf6', secret: 'JBSWY3DPEHPK3PXP' }),

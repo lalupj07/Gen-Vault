@@ -10,6 +10,7 @@ import { cn, getSecondsRemaining, getTimeBasedProgress } from '@/lib/utils';
 import { api, type VaultEntry } from '@/lib/api';
 import { onShortcut } from '@/lib/shortcuts';
 import { analyzeOtpauthUri, otpauthBlocked } from '@/lib/otpauth-safety';
+import { isDemoMode } from '@/lib/demo/flag';
 import QRScanner from './QRScanner';
 
 interface AuthenticatorProps {
@@ -154,7 +155,7 @@ function OTPCard({ entry, index, onFavorite }: { entry: VaultEntry; index: numbe
         <div className="flex items-center justify-between mt-3 pt-3 border-t border-vault-border/20">
           <span className="text-[10px] text-vault-muted flex items-center gap-1">
             <Lock className="w-3 h-3" />
-            AES-256-GCM • {entry.digits} digits
+            {isDemoMode() ? 'Demo' : 'AES-256-GCM'} • {entry.digits} digits
           </span>
           <span className="text-[10px] text-vault-muted">{entry.category}</span>
         </div>
@@ -225,7 +226,7 @@ export default function Authenticator({ entries }: AuthenticatorProps) {
         <div>
           <h1 className="text-2xl font-bold text-vault-light tracking-tight">Authenticator</h1>
           <p className="text-sm text-vault-muted mt-1">
-            Time-based OTP generation — {otpEntries.length} secured accounts
+            Time-based OTP generation — {otpEntries.length} {isDemoMode() ? 'demo' : 'secured'} accounts
           </p>
         </div>
         <motion.button
