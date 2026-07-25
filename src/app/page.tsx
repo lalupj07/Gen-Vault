@@ -26,6 +26,7 @@ import { COMPANY, PRODUCT } from '@/lib/company';
 import { isWelcomeTourDone, markWelcomeTourDone, resetWelcomeTour } from '@/lib/welcomeTour';
 import { isAndroidShell } from '@/lib/platform';
 import MobileShell from '@/components/mobile/MobileShell';
+import DemoBadge from '@/components/DemoBadge';
 
 export default function Home() {
   const router = useRouter();
@@ -330,6 +331,8 @@ export default function Home() {
 
   // Main Application (desktop)
   return (
+    <>
+    <DemoBadge />
     <div className="fixed inset-0 flex bg-vault-black overflow-hidden">
       <ParticleField />
 
@@ -445,5 +448,6 @@ export default function Home() {
         onSkip={handleWelcomeTourComplete}
       />
     </div>
+    </>
   );
 }

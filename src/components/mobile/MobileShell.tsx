@@ -32,6 +32,7 @@ import {
 } from './MobileTools';
 import { backupReminderDue, backupReminderLabel } from '@/lib/backup-reminder';
 import { M3NavBar, M3Fab } from './m3';
+import DemoBadge from '@/components/DemoBadge';
 
 type MobileTab = 'home' | 'codes' | 'vault' | 'tools' | 'more';
 type MobileStack = 'tabs' | 'feature' | 'add' | 'tool' | 'detail';
@@ -384,6 +385,7 @@ export default function MobileShell() {
         setDragX(0);
       }}
     >
+      <DemoBadge />
       {/* Dim previous layer while swiping back */}
       {dragProgress > 0.01 && (
         <div

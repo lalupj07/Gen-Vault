@@ -12,6 +12,7 @@ import { useAuth } from '@/lib/auth';
 import { markBackupDone, backupReminderLabel, backupReminderDue } from '@/lib/backup-reminder';
 import MobileTimeSync from './MobileTimeSync';
 import AccountRecoveryScreen from '@/components/AccountRecoveryScreen';
+import { isDemoMode } from '@/lib/demo/flag';
 
 interface Props {
   onRefresh: () => void;
@@ -340,6 +341,27 @@ export default function MobileSettings({ onRefresh, onOpenAbout }: Props) {
           Lost master password and recovery codes? Erase this device&rsquo;s vault and create a new
           account. GenXis cannot restore a zero-knowledge vault.
         </p>
+        {isDemoMode() && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={async () => {
+              if (!window.confirm('Reset demo data? This clears this browser\u2019s demo vault.')) return;
+              setBusy(true);
+              try {
+                await api.eraseVaultAndReset('DELETE MY VAULT');
+                window.location.reload();
+              } catch (e) {
+                setErr(e instanceof Error ? e.message : 'Reset failed');
+                setBusy(false);
+              }
+            }}
+            className="w-full min-h-[48px] rounded-[var(--m3-radius-lg)] border border-accent-danger/40 px-4 text-sm font-medium text-accent-danger hover:bg-accent-danger/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-danger flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            <Trash2 className="w-4 h-4" aria-hidden />
+            Reset demo
+          </button>
+        )}
         <button
           type="button"
           onClick={() => setShowRecovery(true)}

@@ -7,6 +7,8 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { api, type HardwareSecurityKeyPublic } from '@/lib/api';
 import AccountRecoveryScreen from './AccountRecoveryScreen';
+import DemoBadge from './DemoBadge';
+import { isDemoMode } from '@/lib/demo/flag';
 
 export default function UnlockScreen() {
   const {
@@ -40,6 +42,8 @@ export default function UnlockScreen() {
 
   if (showRecovery) {
     return (
+      <>
+      <DemoBadge />
       <AccountRecoveryScreen
         username={user?.username || ''}
         onBack={() => setShowRecovery(false)}
@@ -51,6 +55,7 @@ export default function UnlockScreen() {
           resetToSetup();
         }}
       />
+      </>
     );
   }
 
@@ -101,6 +106,8 @@ export default function UnlockScreen() {
   };
 
   return (
+    <>
+    <DemoBadge />
     <div className="fixed inset-0 bg-vault-black flex items-center justify-center px-4 m3-mobile-root">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -117,6 +124,11 @@ export default function UnlockScreen() {
             <p className="text-[color:var(--md-on-surface-variant)] text-sm mt-2">
               {user ? `Welcome back, ${user.displayName}` : 'Unlock to continue'}
             </p>
+            {isDemoMode() && (
+              <p className="mt-2 text-sm text-[color:var(--md-on-surface-variant)]">
+                Browser demo only — not encrypted like the real GenVault app. Do not store real secrets.
+              </p>
+            )}
           </div>
 
           {error && (
@@ -261,5 +273,6 @@ export default function UnlockScreen() {
         </div>
       </motion.div>
     </div>
+    </>
   );
 }

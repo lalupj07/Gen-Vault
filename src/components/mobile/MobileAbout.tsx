@@ -4,6 +4,7 @@ import { ExternalLink, Lightbulb, Mail, Shield } from 'lucide-react';
 import { COMPANY, PRODUCT } from '@/lib/company';
 import { useI18n } from '@/lib/i18n';
 import { GlassSurface, M3IconWell } from './m3';
+import { isDemoMode } from '@/lib/demo/flag';
 
 export default function MobileAbout() {
   const { t } = useI18n();
@@ -24,6 +25,11 @@ export default function MobileAbout() {
         </div>
       </div>
       <p className="m3-body text-[color:var(--md-on-surface-variant)]">{PRODUCT.tagline}</p>
+      {isDemoMode() && (
+        <p className="text-sm text-[color:var(--md-on-surface-variant)]">
+          Browser demo only — not encrypted like the real GenVault app. Do not store real secrets.
+        </p>
+      )}
       <p className="text-xs text-[color:var(--md-on-surface-variant)]">{t('mobile.about.blurb')}</p>
       <GlassSurface className="overflow-hidden p-0 divide-y divide-[color:var(--md-outline-variant)]">
         <a
