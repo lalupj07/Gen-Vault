@@ -33,6 +33,24 @@ describe('GenVault API smoke', () => {
   });
 });
 
+describe('GenVault demo gate', () => {
+  const prev = process.env.NEXT_PUBLIC_GENVAULT_DEMO;
+
+  afterEach(() => {
+    process.env.NEXT_PUBLIC_GENVAULT_DEMO = prev;
+    jest.resetModules();
+  });
+
+  it('still refuses browser invoke when demo flag is off', async () => {
+    process.env.NEXT_PUBLIC_GENVAULT_DEMO = 'false';
+    jest.resetModules();
+    const { api: freshApi } = await import('@/lib/api');
+    await expect(freshApi.checkAccountExists()).rejects.toThrow(
+      /GenVault application|Browser mode is disabled for security/i,
+    );
+  });
+});
+
 describe('GenVault security contracts', () => {
   it('VaultEntry type has no secret field at runtime check', () => {
     const sample = {

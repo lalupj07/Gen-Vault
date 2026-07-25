@@ -1,5 +1,6 @@
 // GenVault Backend API Bridge — Tauri IPC only (no insecure browser fallback)
 
+import { isDemoMode } from './demo/flag';
 import { generateTotpCode, verifyTotpCode, generateTotpSecret } from './totp-browser';
 
 export interface User {
@@ -156,15 +157,19 @@ export function invokeErrorMessage(err: unknown): string {
 }
 
 async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-  if (!isTauri()) {
-    throw new Error('GenVault requires the GenVault application. Browser mode is disabled for security.');
+  if (isTauri()) {
+    const { invoke: tauriInvoke } = await import('@tauri-apps/api/core');
+    try {
+      return await tauriInvoke<T>(cmd, args);
+    } catch (err) {
+      throw new Error(invokeErrorMessage(err));
+    }
   }
-  const { invoke: tauriInvoke } = await import('@tauri-apps/api/core');
-  try {
-    return await tauriInvoke<T>(cmd, args);
-  } catch (err) {
-    throw new Error(invokeErrorMessage(err));
+  if (isDemoMode()) {
+    const { demoInvoke } = await import('./demo');
+    return (await demoInvoke(cmd, args)) as T;
   }
+  throw new Error('GenVault requires the GenVault application. Browser mode is disabled for security.');
 }
 
 export const api = {
