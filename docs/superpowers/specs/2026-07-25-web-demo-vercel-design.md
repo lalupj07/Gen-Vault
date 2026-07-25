@@ -1,7 +1,7 @@
 # GenVault Web Demo — Vercel Tester Link Design
 
 **Date:** 2026-07-25  
-**Status:** Approved — awaiting implementation plan  
+**Status:** Implemented — pending Vercel URL  
 **Product:** GenVault — offline authentication vault (GenXis Innovations)  
 **Related:** Complements Android Wave 0 (`2026-07-22-android-play-wave0-design.md`) by giving testers a no-install link; does **not** replace APK/AAB or Play Internal testing for real-device security validation.
 

@@ -23,6 +23,8 @@ Without this flag, the app builds as the Tauri static export and does not enable
 
 ## Tester access
 
+**Production URL:** pending operator deploy (see below).
+
 After **Reset demo** (or first visit), unlock with:
 
 ```
@@ -46,6 +48,18 @@ NEXT_PUBLIC_GENVAULT_DEMO=true npm run build && npx serve out
 ```
 
 Open the URL printed by `serve` (typically `http://localhost:3000`).
+
+## Deploy (operator)
+
+Production URL is **not live yet**. Run from this worktree after setting env in the Vercel dashboard:
+
+```bash
+npx vercel --prod
+```
+
+Ensure `NEXT_PUBLIC_GENVAULT_DEMO=true` is set for Production and Preview.
+
+**2026-07-25 attempt:** `npx vercel --prod` created project `lalu-james-projects/web-demo-vercel` but the build failed: Vercel Next.js integration expects `.next/routes-manifest.json`, while this app static-exports to `out/`. Operator should either remove `"framework": "nextjs"` from `vercel.json` and treat the deploy as a static site, or adjust Vercel project settings (Output Directory `out`, Framework Preset **Other**) before retrying. Paste the stable production URL here once deploy succeeds.
 
 ## Security notes
 
