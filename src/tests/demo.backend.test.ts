@@ -59,3 +59,37 @@ describe('demo auth', () => {
     await api.unlockWithPassword(SEED_PASSWORD);
   });
 });
+
+describe('demo vault + otp', () => {
+  beforeEach(async () => {
+    process.env.NEXT_PUBLIC_GENVAULT_DEMO = 'true';
+    jest.resetModules();
+    const { resetDemo } = await import('@/lib/demo/store');
+    await resetDemo();
+    const { api } = await import('@/lib/api');
+    const { SEED_PASSWORD } = await import('@/lib/demo/seed');
+    await api.unlockWithPassword(SEED_PASSWORD);
+  });
+
+  it('lists entries and generates 6-digit TOTP', async () => {
+    const { api } = await import('@/lib/api');
+    const entries = await api.getVaultEntries();
+    expect(entries.length).toBeGreaterThan(0);
+    expect(entries[0]).not.toHaveProperty('secret');
+    const otp = await api.generateOtp(entries[0].id);
+    expect(otp.code).toMatch(/^\d{6}$/);
+    expect(otp.period).toBe(30);
+  });
+
+  it('adds and removes an entry', async () => {
+    const { api } = await import('@/lib/api');
+    const created = await api.addVaultEntry({
+      name: 'New', issuer: 'Test', secret: 'JBSWY3DPEHPK3PXP',
+      category: 'Work', icon: '🔑', color: '#fff',
+    });
+    expect(created.name).toBe('New');
+    await api.removeVaultEntry(created.id);
+    const ids = (await api.getVaultEntries()).map((e) => e.id);
+    expect(ids).not.toContain(created.id);
+  });
+});
