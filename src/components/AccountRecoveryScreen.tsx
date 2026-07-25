@@ -6,6 +6,7 @@ import { AlertTriangle, ArrowLeft, KeyRound, Trash2 } from 'lucide-react';
 import PasswordReset from '@/components/PasswordReset';
 import { api, invokeErrorMessage } from '@/lib/api';
 import { VAULT_ERASE_CONFIRMATION, isVaultEraseConfirmation } from '@/lib/vault-reset';
+import { isDemoMode } from '@/lib/demo/flag';
 
 type View = 'options' | 'recovery-code' | 'erase-confirmation';
 type RecoveryStatus = 'checking' | 'available' | 'unavailable' | 'unknown';
@@ -145,7 +146,9 @@ export default function AccountRecoveryScreen({
             </h1>
             <p className="mt-3 max-w-[68ch] text-sm leading-6 text-vault-muted">
               All local TOTP secrets, passwords, notes, attachments, settings, and recovery codes
-              will be deleted. GenXis cannot restore a zero-knowledge vault.
+              will be deleted. {isDemoMode()
+                ? 'GenXis cannot restore lost demo credentials.'
+                : 'GenXis cannot restore a zero-knowledge vault.'}
             </p>
 
             <label htmlFor="vault-erase-confirmation" className="mt-6 block text-sm text-vault-light">

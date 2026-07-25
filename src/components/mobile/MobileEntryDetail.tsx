@@ -6,6 +6,7 @@ import { api, type VaultEntry } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { copySecure, clipboardClearSeconds } from '@/lib/secure-clipboard';
 import { vibrateOnOtpExpiry } from '@/lib/time-sync';
+import { isDemoMode } from '@/lib/demo/flag';
 
 interface Props {
   entry: VaultEntry;
@@ -244,7 +245,9 @@ export default function MobileEntryDetail({ entry, onBack, onDeleted, onUpdated 
         ) : (
           <>
             <p className="text-sm text-[color:var(--md-on-surface-variant)] mt-4 mb-4">
-              Password is encrypted at rest. Reveal only when needed — clipboard auto-clears.
+              {isDemoMode()
+                ? 'Demo storage — not encrypted like production. Reveal only when needed — clipboard auto-clears.'
+                : 'Password is encrypted at rest. Reveal only when needed — clipboard auto-clears.'}
             </p>
             <button
               type="button"

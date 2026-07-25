@@ -12,6 +12,7 @@ import { type AppState } from '@/lib/store';
 import { api, type VaultEntry, type DeviceEntry, type SecurityEvent } from '@/lib/api';
 import SecurityEventLog from './SecurityEventLog';
 import { PasswordHealthPanel, UsageStatisticsPanel } from './FeatureTools';
+import { isDemoMode } from '@/lib/demo/flag';
 
 interface DashboardProps {
   appState: AppState;
@@ -137,11 +138,13 @@ export default function Dashboard({ appState, vaultEntries }: DashboardProps) {
         <div className="min-w-0">
           <h1 className="text-xl sm:text-2xl font-bold text-vault-light tracking-tight">Security Dashboard</h1>
           <p className="text-xs sm:text-sm text-vault-muted mt-1 truncate">
-            Real-time threat monitoring &amp; encrypted vault status — {currentTime}
+            {isDemoMode()
+              ? `Browser demo vault status — ${currentTime}`
+              : `Real-time threat monitoring & encrypted vault status — ${currentTime}`}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <StatusBadge status="active" label="AES-256-GCM Active" />
+          <StatusBadge status="active" label={isDemoMode() ? 'Demo mode' : 'AES-256-GCM Active'} />
           <StatusBadge status={appState.threatLevel === 'safe' ? 'active' : 'critical'} label={`Threat: ${appState.threatLevel}`} />
         </div>
       </motion.div>
@@ -167,11 +170,18 @@ export default function Dashboard({ appState, vaultEntries }: DashboardProps) {
             </div>
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
-            {[
-              ['AES-256-GCM', 'Cipher'],
-              ['Argon2id', 'KDF'],
-              ['Local-only', 'Storage'],
-            ].map(([title, sub]) => (
+            {(isDemoMode()
+              ? [
+                  ['Browser demo', 'Mode'],
+                  ['Local only', 'Storage'],
+                  ['Not encrypted', 'Demo data'],
+                ]
+              : [
+                  ['AES-256-GCM', 'Cipher'],
+                  ['Argon2id', 'KDF'],
+                  ['Local-only', 'Storage'],
+                ]
+            ).map(([title, sub]) => (
               <div
                 key={title}
                 className="px-2.5 py-1.5 rounded-xl bg-vault-black/40 border border-vault-border/40"
@@ -184,7 +194,7 @@ export default function Dashboard({ appState, vaultEntries }: DashboardProps) {
         </motion.div>
 
         <div className="md:col-span-8 grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
-          <MetricCard icon={Key} label="Secured Credentials" value={appState.totalCredentials} subtext="AES-256" color="cyan" />
+          <MetricCard icon={Key} label="Secured Credentials" value={appState.totalCredentials} subtext={isDemoMode() ? 'Demo' : 'AES-256'} color="cyan" />
           <MetricCard icon={Smartphone} label="Trusted Devices" value={appState.activeDevices} subtext="Verified" color="emerald" />
           <MetricCard icon={Shield} label="Security Score" value={`${appState.securityScore}%`} subtext="Fortress" color="purple" />
           <MetricCard icon={Activity} label="Active Sessions" value={2} subtext="Monitored" color="blue" />

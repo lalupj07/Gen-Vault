@@ -30,7 +30,9 @@ export default function MobileAbout() {
           Browser demo only — not encrypted like the real GenVault app. Do not store real secrets.
         </p>
       )}
-      <p className="text-xs text-[color:var(--md-on-surface-variant)]">{t('mobile.about.blurb')}</p>
+      <p className="text-xs text-[color:var(--md-on-surface-variant)]">
+        {isDemoMode() ? 'Browser demo · local storage only' : t('mobile.about.blurb')}
+      </p>
       <GlassSurface className="overflow-hidden p-0 divide-y divide-[color:var(--md-outline-variant)]">
         <a
           href={COMPANY.microsoftStoreUrl}
