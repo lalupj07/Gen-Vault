@@ -58,16 +58,17 @@ export function findEntry(state: DemoState, entryId: string): DemoVaultEntry {
 }
 
 export function createDemoEntry(
-  partial: Omit<DemoVaultEntry, 'created_at' | 'last_used'> & Partial<Pick<DemoVaultEntry, 'created_at' | 'last_used'>>,
+  partial: Omit<DemoVaultEntry, 'created_at' | 'last_used' | 'digits' | 'period'> &
+    Partial<Pick<DemoVaultEntry, 'created_at' | 'last_used' | 'digits' | 'period'>>,
 ): DemoVaultEntry {
   const now = nowTs();
   return {
-    digits: 6,
-    period: 30,
     tags: [],
     favorite: false,
     created_at: now,
     last_used: now,
+    digits: 6,
+    period: 30,
     ...partial,
   };
 }

@@ -31,3 +31,7 @@ APKs under `src-tauri/gen/android/app/build/outputs/` (ignored by git).
 - Store publishing later: dedicated escrowed keystore.
 
 See `BUILD_RELEASE.md` for details.
+
+## Web demo (Vercel)
+
+Optional static browser demo for UI/flow testing (not production vault security). See [`docs/DEMO_VERCEL.md`](docs/DEMO_VERCEL.md) for Vercel project settings, env vars, and local preview.
