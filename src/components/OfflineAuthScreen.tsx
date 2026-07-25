@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/lib/auth';
 import { COMPANY, PRODUCT } from '@/lib/company';
 import { api, invokeErrorMessage } from '@/lib/api';
 import { User, Key } from 'lucide-react';
-import PasswordReset from './PasswordReset';
+import AccountRecoveryScreen from './AccountRecoveryScreen';
 
 function VaultEmblem() {
   return (
@@ -54,16 +54,46 @@ function VaultEmblem() {
 }
 
 export default function OfflineAuthScreen() {
-  const { authFlow, createAccount, logIn } = useAuth();
+  const { authFlow, createAccount, logIn, resetToSetup } = useAuth();
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [masterPassword, setMasterPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [resetting, setResetting] = useState(false);
-  const [showPasswordReset, setShowPasswordReset] = useState(false);
+  const [showRecovery, setShowRecovery] = useState(false);
 
   const isSetup = authFlow === 'setup_account';
+
+  useEffect(() => {
+    if (isSetup) return;
+    let active = true;
+    api.getLoginHint()
+      .then((hint) => {
+        if (active && hint?.trim()) setUsername(hint.trim());
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [isSetup]);
+
+  if (showRecovery && !isSetup) {
+    return (
+      <AccountRecoveryScreen
+        username={username}
+        onBack={() => setShowRecovery(false)}
+        onResetComplete={() => {
+          setShowRecovery(false);
+          setUsername('');
+          setDisplayName('');
+          setMasterPassword('');
+          setError('');
+          resetToSetup();
+        }}
+      />
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -206,10 +236,10 @@ export default function OfflineAuthScreen() {
           <div className="mt-4 text-center">
             <button
               type="button"
-              onClick={() => setShowPasswordReset(true)}
-              className="text-xs text-vault-muted hover:text-cyber-cyan transition-colors"
+              onClick={() => setShowRecovery(true)}
+              className="min-h-[44px] px-2 text-xs text-vault-muted hover:text-cyber-cyan transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyber-purple rounded-lg"
             >
-              Forgot password?
+              Can&rsquo;t sign in?
             </button>
           </div>
         )}
@@ -224,17 +254,6 @@ export default function OfflineAuthScreen() {
         </div>
       </motion.div>
 
-      {/* Password Reset Modal */}
-      {showPasswordReset && (
-        <PasswordReset
-          username={username}
-          onSuccess={() => {
-            setShowPasswordReset(false);
-            setError('');
-          }}
-          onCancel={() => setShowPasswordReset(false)}
-        />
-      )}
     </div>
   );
 }

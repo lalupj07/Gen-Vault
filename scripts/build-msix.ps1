@@ -17,8 +17,8 @@ $MsixRoot = Join-Path $ProjectRoot "store\msix"
 $StageDir = Join-Path $MsixRoot "stage"
 $AssetsDir = Join-Path $MsixRoot "Assets"
 $Manifest = Join-Path $MsixRoot "Package.appxmanifest"
-$Version = "1.0.1.0"
-$OutDir = Join-Path $ProjectRoot "dist\release\v1.0.0"
+$Version = "1.5.0.0"
+$OutDir = Join-Path $ProjectRoot "dist\release\v1.5.0"
 $MsixName = "GenVault_${Version}_x64.msix"
 
 Write-Host "GenVault MSIX Store Package Build" -ForegroundColor Cyan

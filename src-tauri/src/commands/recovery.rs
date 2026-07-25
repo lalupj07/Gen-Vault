@@ -150,8 +150,15 @@ pub fn reset_password_with_recovery_code(
     validate_master_password(&new_password)?;
 
     let meta = store::load_meta().map_err(|e| format!("Failed to load metadata: {}", e))?;
-    if meta.username.to_lowercase() != username.to_lowercase() {
-        return Err("Username mismatch".to_string());
+    let provided = username.trim();
+    if provided.is_empty() {
+        return Err("Enter the vault username to reset your password.".to_string());
+    }
+    if meta.username.trim().to_lowercase() != provided.to_lowercase() {
+        return Err(
+            "Username mismatch. Use the same username shown on the login screen for this vault."
+                .to_string(),
+        );
     }
 
     let vmk = match recovery_codes::recover_vmk_with_code(&recovery_code) {

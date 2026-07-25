@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Fingerprint, Download, Upload, Info, Sun, Moon, Monitor } from 'lucide-react';
+import { Fingerprint, Download, Upload, Info, Sun, Moon, Monitor, Trash2 } from 'lucide-react';
 import { api, type AppSettings } from '@/lib/api';
 import { PRODUCT } from '@/lib/company';
 import { cn } from '@/lib/utils';
@@ -11,6 +11,7 @@ import { useFont, type UiFont } from '@/lib/font';
 import { useAuth } from '@/lib/auth';
 import { markBackupDone, backupReminderLabel, backupReminderDue } from '@/lib/backup-reminder';
 import MobileTimeSync from './MobileTimeSync';
+import AccountRecoveryScreen from '@/components/AccountRecoveryScreen';
 
 interface Props {
   onRefresh: () => void;
@@ -21,7 +22,7 @@ export default function MobileSettings({ onRefresh, onOpenAbout }: Props) {
   const { theme, setTheme } = useTheme();
   const { t, locale, setLocale, locales } = useI18n();
   const { font, setFont, fonts } = useFont();
-  const { refreshUnlockMethods } = useAuth();
+  const { refreshUnlockMethods, user, resetToSetup } = useAuth();
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [helloOk, setHelloOk] = useState(false);
   const [hasHello, setHasHello] = useState(false);
@@ -29,6 +30,7 @@ export default function MobileSettings({ onRefresh, onOpenAbout }: Props) {
   const [err, setErr] = useState('');
   const [passphrase, setPassphrase] = useState('');
   const [busy, setBusy] = useState(false);
+  const [showRecovery, setShowRecovery] = useState(false);
 
   const load = async () => {
     try {
@@ -48,6 +50,22 @@ export default function MobileSettings({ onRefresh, onOpenAbout }: Props) {
   useEffect(() => {
     load();
   }, []);
+
+  if (showRecovery) {
+    return (
+      <AccountRecoveryScreen
+        username={user?.username || ''}
+        onBack={() => setShowRecovery(false)}
+        onResetComplete={() => {
+          setShowRecovery(false);
+          setPassphrase('');
+          setMsg('');
+          setErr('');
+          resetToSetup();
+        }}
+      />
+    );
+  }
 
   const saveTimeout = async (mins: number) => {
     if (!settings) return;
@@ -314,6 +332,22 @@ export default function MobileSettings({ onRefresh, onOpenAbout }: Props) {
 
       <section className="m3-glass p-4">
         <MobileTimeSync />
+      </section>
+
+      <section className="m3-glass p-4 space-y-3 border border-accent-danger/25">
+        <p className="m3-title-md text-accent-danger">Can&rsquo;t sign in / start fresh</p>
+        <p className="text-xs text-[color:var(--md-on-surface-variant)] leading-5">
+          Lost master password and recovery codes? Erase this device&rsquo;s vault and create a new
+          account. GenXis cannot restore a zero-knowledge vault.
+        </p>
+        <button
+          type="button"
+          onClick={() => setShowRecovery(true)}
+          className="w-full min-h-[48px] rounded-[var(--m3-radius-lg)] border border-accent-danger/40 px-4 text-sm font-medium text-accent-danger hover:bg-accent-danger/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-danger flex items-center justify-center gap-2"
+        >
+          <Trash2 className="w-4 h-4" aria-hidden />
+          Erase vault and start fresh
+        </button>
       </section>
 
       <section className="m3-glass p-4 flex gap-3">

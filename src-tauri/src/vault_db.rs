@@ -163,8 +163,21 @@ pub fn entry_public(entry: &VaultEntry) -> VaultEntryPublic {
 
 pub fn wipe_db() -> Result<(), StoreError> {
     let path = db_path()?;
-    if path.exists() {
-        std::fs::remove_file(path)?;
+    let wal = path.with_extension("db-wal");
+    let shm = path.with_extension("db-shm");
+    // Also cover "vault.db-wal" style when extension is "db".
+    let wal_alt = path.with_file_name(format!(
+        "{}-wal",
+        path.file_name().and_then(|s| s.to_str()).unwrap_or("vault.db")
+    ));
+    let shm_alt = path.with_file_name(format!(
+        "{}-shm",
+        path.file_name().and_then(|s| s.to_str()).unwrap_or("vault.db")
+    ));
+    for p in [&path, &wal, &shm, &wal_alt, &shm_alt] {
+        if p.exists() {
+            let _ = std::fs::remove_file(p);
+        }
     }
     Ok(())
 }

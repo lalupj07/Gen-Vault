@@ -1,6 +1,6 @@
 # GenVault — Microsoft Store Certification Notes
 
-Provide this document in Partner Center **Notes for certification** when submitting GenVault v1.0.0.
+Provide this document in Partner Center **Notes for certification** when submitting GenVault v1.5.0.
 
 ---
 
@@ -100,7 +100,7 @@ No broad file system, webcam, microphone, or location capabilities are requested
 
 - **Package type:** MSIX (desktop, full trust)
 - **Entry point:** genvault.exe
-- **Version:** 1.0.0.0
+- **Version:** 1.5.0.0
 - **Architecture:** x64
 - **Signing:** Submitted unsigned; Microsoft Store re-signs on ingestion
 

@@ -115,10 +115,14 @@ class HelloKeystorePlugin(private val activity: Activity) : Plugin(activity) {
 
     private fun deleteInternal() {
         cipherFile().delete()
-        val ks = KeyStore.getInstance(ANDROID_KEYSTORE)
-        ks.load(null)
-        if (ks.containsAlias(KEY_ALIAS)) {
-            ks.deleteEntry(KEY_ALIAS)
+        try {
+            val ks = KeyStore.getInstance(ANDROID_KEYSTORE)
+            ks.load(null)
+            if (ks.containsAlias(KEY_ALIAS)) {
+                ks.deleteEntry(KEY_ALIAS)
+            }
+        } catch (_: Exception) {
+            // Best-effort: presence-only model must not block vault wipe.
         }
     }
 
@@ -138,7 +142,7 @@ class HelloKeystorePlugin(private val activity: Activity) : Plugin(activity) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             builder.setUserAuthenticationParameters(
                 60,
-                KeyProperties.AUTH_BIOMETRIC_WEAK or KeyProperties.AUTH_DEVICE_CREDENTIAL,
+                KeyProperties.AUTH_BIOMETRIC_STRONG or KeyProperties.AUTH_DEVICE_CREDENTIAL,
             )
         } else {
             @Suppress("DEPRECATION")

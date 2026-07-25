@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Key, Check, AlertCircle } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api, invokeErrorMessage } from '@/lib/api';
 import { validatePassword } from '@/lib/validation';
 
 interface PasswordResetProps {
@@ -13,6 +13,7 @@ interface PasswordResetProps {
 }
 
 export default function PasswordReset({ username, onSuccess, onCancel }: PasswordResetProps) {
+  const [resolvedUsername, setResolvedUsername] = useState(username.trim());
   const [hasCodes, setHasCodes] = useState<boolean | null>(null);
   const [recoveryCode, setRecoveryCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -22,15 +23,39 @@ export default function PasswordReset({ username, onSuccess, onCancel }: Passwor
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
+    let active = true;
     api.hasAccountRecoveryCodes()
-      .then(setHasCodes)
+      .then((has) => {
+        if (active) setHasCodes(has);
+      })
       .catch(() => {
-        setHasCodes(false);
-        setError('Failed to check recovery methods');
+        if (active) {
+          setHasCodes(false);
+          setError('Failed to check recovery methods');
+        }
       });
-  }, []);
+
+    if (!username.trim()) {
+      api.getLoginHint()
+        .then((hint) => {
+          if (active && hint?.trim()) setResolvedUsername(hint.trim());
+        })
+        .catch(() => {});
+    } else {
+      setResolvedUsername(username.trim());
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [username]);
 
   const handlePasswordReset = async () => {
+    const accountUsername = resolvedUsername.trim();
+    if (!accountUsername) {
+      setError('Enter the vault username');
+      return;
+    }
     if (!recoveryCode.trim()) {
       setError('Enter a recovery code');
       return;
@@ -48,11 +73,15 @@ export default function PasswordReset({ username, onSuccess, onCancel }: Passwor
     setLoading(true);
     setError('');
     try {
-      await api.resetPasswordWithRecoveryCode(username, recoveryCode.trim(), newPassword);
+      await api.resetPasswordWithRecoveryCode(
+        accountUsername,
+        recoveryCode.trim(),
+        newPassword,
+      );
       setSuccess(true);
       setTimeout(() => onSuccess(), 2000);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to reset password');
+      setError(invokeErrorMessage(e) || 'Failed to reset password');
     } finally {
       setLoading(false);
     }
@@ -73,14 +102,14 @@ export default function PasswordReset({ username, onSuccess, onCancel }: Passwor
   }
 
   return (
-    <div className="fixed inset-0 bg-vault-black/95 flex items-center justify-center p-4 z-50">
+    <div className="fixed inset-0 bg-vault-black/95 flex items-center justify-center p-4 z-50 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]">
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-md">
         <div className="bg-vault-dark border border-vault-border/40 rounded-2xl p-6">
           <div className="text-center mb-6">
             <Key className="w-10 h-10 text-cyber-cyan mx-auto mb-3" />
             <h2 className="text-2xl font-bold text-vault-light mb-2">Reset Your Password</h2>
             <p className="text-sm text-vault-muted">
-              Enter a one-time recovery code and your new password together
+              Enter your vault username, a one-time recovery code, and your new password
             </p>
           </div>
 
@@ -99,11 +128,23 @@ export default function PasswordReset({ username, onSuccess, onCancel }: Passwor
               <div className="space-y-4 mb-4">
                 <input
                   type="text"
+                  value={resolvedUsername}
+                  onChange={(e) => setResolvedUsername(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-vault-black/50 border border-vault-border/40 text-vault-light text-sm"
+                  placeholder="Vault username"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                />
+                <input
+                  type="text"
                   value={recoveryCode}
                   onChange={(e) => setRecoveryCode(e.target.value.toUpperCase())}
                   className="w-full px-4 py-3 rounded-xl bg-vault-black/50 border border-vault-border/40 text-vault-light font-mono text-sm tracking-wider"
                   placeholder="XXXX-XXXX-XXXX-XXXX"
                   autoComplete="off"
+                  autoCapitalize="characters"
+                  spellCheck={false}
                 />
                 <input
                   type="password"
@@ -111,6 +152,7 @@ export default function PasswordReset({ username, onSuccess, onCancel }: Passwor
                   onChange={(e) => setNewPassword(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl bg-vault-black/50 border border-vault-border/40 text-vault-light text-sm"
                   placeholder="New password"
+                  autoComplete="new-password"
                 />
                 <input
                   type="password"
@@ -118,12 +160,13 @@ export default function PasswordReset({ username, onSuccess, onCancel }: Passwor
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl bg-vault-black/50 border border-vault-border/40 text-vault-light text-sm"
                   placeholder="Confirm password"
+                  autoComplete="new-password"
                 />
               </div>
-              {error && <p className="text-xs text-accent-danger mb-4">{error}</p>}
+              {error && <p className="text-xs text-accent-danger mb-4" role="alert">{error}</p>}
               <div className="flex gap-3">
-                <button onClick={onCancel} className="flex-1 py-3 rounded-xl border border-vault-border/40 text-vault-light">Cancel</button>
-                <button onClick={handlePasswordReset} disabled={loading} className="flex-1 py-3 rounded-xl bg-gradient-to-r from-cyber-cyan to-cyber-purple text-vault-black font-medium disabled:opacity-50">
+                <button type="button" onClick={onCancel} className="flex-1 min-h-[48px] py-3 rounded-xl border border-vault-border/40 text-vault-light">Cancel</button>
+                <button type="button" onClick={handlePasswordReset} disabled={loading} className="flex-1 min-h-[48px] py-3 rounded-xl bg-gradient-to-r from-cyber-cyan to-cyber-purple text-vault-black font-medium disabled:opacity-50">
                   {loading ? 'Resetting...' : 'Reset Password'}
                 </button>
               </div>

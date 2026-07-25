@@ -6,11 +6,12 @@ import { Eye, EyeOff, Fingerprint, KeyRound, ArrowRight, AlertCircle, HardDrive,
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { api, type HardwareSecurityKeyPublic } from '@/lib/api';
+import AccountRecoveryScreen from './AccountRecoveryScreen';
 
 export default function UnlockScreen() {
   const {
     user, unlockMethods, unlockWithPassword, unlockWithHello,
-    unlockWithSecurityKey, logOut,
+    unlockWithSecurityKey, logOut, resetToSetup,
   } = useAuth();
 
   const hasPassword = unlockMethods.includes('password') || unlockMethods.length === 0;
@@ -25,6 +26,7 @@ export default function UnlockScreen() {
   const [showSecret, setShowSecret] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showRecovery, setShowRecovery] = useState(false);
 
   useEffect(() => {
     if (!hasSecurityKey) return;
@@ -35,6 +37,22 @@ export default function UnlockScreen() {
       })
       .catch(() => setHardwareKeys([]));
   }, [hasSecurityKey]);
+
+  if (showRecovery) {
+    return (
+      <AccountRecoveryScreen
+        username={user?.username || ''}
+        onBack={() => setShowRecovery(false)}
+        onResetComplete={() => {
+          setShowRecovery(false);
+          setSecret('');
+          setKeyPin('');
+          setError('');
+          resetToSetup();
+        }}
+      />
+    );
+  }
 
   const handleSecretUnlock = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -227,8 +245,16 @@ export default function UnlockScreen() {
 
           <button
             type="button"
+            onClick={() => setShowRecovery(true)}
+            className="w-full mt-4 text-center text-sm text-[color:var(--md-on-surface-variant)] hover:text-cyber-cyan transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyber-purple rounded-lg"
+          >
+            Can&rsquo;t sign in?
+          </button>
+
+          <button
+            type="button"
             onClick={logOut}
-            className="w-full mt-6 text-center text-sm text-[color:var(--md-on-surface-variant)] hover:text-accent-danger transition-colors min-h-[44px]"
+            className="w-full mt-2 text-center text-sm text-[color:var(--md-on-surface-variant)] hover:text-accent-danger transition-colors min-h-[44px]"
           >
             Sign out instead
           </button>

@@ -21,8 +21,8 @@ export const COMPANY = {
 
 export const PRODUCT = {
   name: 'GenVault',
-  version: '1.0.0',
-  build: '1.0.0',
+  version: '1.5.0',
+  build: '1.5.0',
   tagline: 'Offline Authentication Vault',
   shortDescription: 'Offline 2FA vault with encrypted local credential storage',
 } as const;

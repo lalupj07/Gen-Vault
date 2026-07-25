@@ -1,4 +1,4 @@
-# GenVault v1.0.0 Release Build Script
+# GenVault Release Build Script
 # Automates tests, Next.js export, and Tauri Windows installers (MSI / NSIS).
 
 param(
@@ -13,7 +13,8 @@ $ProjectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $ProjectRoot
 $env:CARGO_TARGET_DIR = Join-Path $ProjectRoot "src-tauri\target"
 
-Write-Host "GenVault v1.0.0 Release Build" -ForegroundColor Cyan
+$AppVersion = (Get-Content (Join-Path $ProjectRoot "package.json") | ConvertFrom-Json).version
+Write-Host "GenVault v$AppVersion Release Build" -ForegroundColor Cyan
 Write-Host "======================================" -ForegroundColor Cyan
 if ($MsiOnly) {
     Write-Host "Target: MSI installer only" -ForegroundColor Cyan

@@ -1,6 +1,6 @@
 # GenVault — Microsoft Store Listing (en-US)
 
-Use this content in [Partner Center](https://partner.microsoft.com/) when submitting GenVault v1.0.0.
+Use this content in [Partner Center](https://partner.microsoft.com/) when submitting GenVault v1.5.0.
 
 ## App name
 GenVault
@@ -16,7 +16,7 @@ Offline 2FA vault and encrypted password manager. AES-256-GCM local encryption, 
 
 ## Description
 
-GenVault v1.0.0 by GenXis Innovations is a secure offline authentication vault for Windows. Store TOTP codes, passwords, secure notes, and attachments locally with zero-knowledge encryption — your master password never leaves your device.
+GenVault v1.5.0 by GenXis Innovations is a secure offline authentication vault for Windows. Store TOTP codes, passwords, secure notes, and attachments locally with zero-knowledge encryption — your master password never leaves your device.
 
 **Why GenVault?**
 - **Offline-first** — Works without internet; your secrets never sync to the cloud
@@ -64,7 +64,7 @@ Capture at 1366×768 or 1920×1080:
 2. TOTP / 2FA list with codes
 3. Password manager view
 4. Settings (Windows Hello / FIDO2)
-5. About screen showing v1.0.0
+5. About screen showing v1.5.0
 
 ## Store logos
 Generated in `store/msix/Assets/` — upload Square310x310 and Wide310x150 to Partner Center.
@@ -81,12 +81,12 @@ The MSIX **Publisher** must match your Partner Center publisher exactly or inges
 npm run build:msix
 ```
 
-Output: `dist/release/v1.0.0/GenVault_1.0.0.0_x64.msix`
+Output: `dist/release/v1.5.0/GenVault_1.5.0.0_x64.msix`
 
 ## Files to upload / attach
 | File | Purpose |
 |------|---------|
-| `GenVault_1.0.0.0_x64.msix` | Store package |
+| `GenVault_1.5.0.0_x64.msix` | Store package |
 | `store/FEATURES.txt` | Feature list for listing / cert |
 | `store/CERTIFICATION_NOTES.md` | Certification test notes |
 | `store/STORE_LISTING.md` | This listing reference |

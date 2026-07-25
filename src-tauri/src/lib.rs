@@ -50,6 +50,7 @@ pub fn run() {
             get_login_hint,
             get_auth_screen_mode,
             reset_local_account,
+            erase_vault_and_reset,
             sign_up,
             log_in,
             log_out,

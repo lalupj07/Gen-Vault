@@ -37,6 +37,7 @@ interface AuthContextType extends AuthState {
   completeOnboarding: () => void;
   updateUser: (updates: Partial<User>) => void;
   setAuthFlow: (flow: AuthFlow) => void;
+  resetToSetup: () => void;
   unlockWithPassword: (password: string) => Promise<{ success: boolean; error?: string }>;
   unlockWithPin: (pin: string) => Promise<{ success: boolean; error?: string }>;
   unlockWithHello: (password: string) => Promise<{ success: boolean; error?: string }>;
@@ -306,6 +307,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState(prev => ({ ...prev, authFlow: flow }));
   }, []);
 
+  // ===== Reset to first-run setup (after full vault erase) =====
+  const resetToSetup = useCallback(() => {
+    setState({
+      user: null,
+      isAuthenticated: false,
+      isLoading: false,
+      authFlow: 'setup_account',
+      vaultLocked: false,
+      unlockMethods: [],
+    });
+  }, []);
+
   // ===== Auto-Lock Enforcement =====
   const [lockSettings, setLockSettings] = useState<{ autoLock: boolean; timeoutMs: number } | null>(null);
 
@@ -371,7 +384,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={{
       ...state, createAccount, logIn, logOut,
-      completeOnboarding, updateUser, setAuthFlow,
+      completeOnboarding, updateUser, setAuthFlow, resetToSetup,
       unlockWithPassword, unlockWithPin, unlockWithHello, unlockWithSecurityKey,
       refreshUnlockMethods, lockVault,
     }}>

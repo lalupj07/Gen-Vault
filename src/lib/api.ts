@@ -171,6 +171,8 @@ export const api = {
   checkAccountExists: () => invoke<boolean>('check_account_exists'),
   getAuthScreenMode: () => invoke<'setup' | 'login'>('get_auth_screen_mode'),
   resetLocalAccount: () => invoke<void>('reset_local_account'),
+  eraseVaultAndReset: (confirmation: string) =>
+    invoke<void>('erase_vault_and_reset', { confirmation }),
   getLoginHint: () => invoke<string | null>('get_login_hint'),
   signUp: (username: string, displayName: string, masterPassword: string) =>
     invoke<User>('sign_up', {

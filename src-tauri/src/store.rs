@@ -375,12 +375,35 @@ pub fn delete_account() -> Result<(), StoreError> {
     delete_keyring_vmk();
     delete_hpk_keyring();
     delete_fpk_keyring();
+    // Presence-only model: HPK wrap is disabled. Never block a full wipe on keystore cleanup.
     #[cfg(target_os = "android")]
-    crate::android_keystore::delete_hpk().map_err(StoreError::Keyring)?;
+    let _ = crate::android_keystore::delete_hpk();
     let _ = crate::vault_db::wipe_db();
     let _ = crate::recovery_codes::delete_all_recovery_codes();
     let dir = data_dir()?;
-    remove_dir_all_with_retry(&dir)?;
+    clear_vault_data_dir(&dir)?;
+    // Success = no account metadata left (root dir may remain on Android).
+    if account_exists().unwrap_or(false) {
+        return Err(StoreError::Io(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "Vault metadata still present after erase",
+        )));
+    }
+    Ok(())
+}
+
+/// Wipe vault files under the data directory. Prefer clearing contents over
+/// removing the root folder — Android often keeps `app_data_dir` open.
+fn clear_vault_data_dir(dir: &std::path::Path) -> Result<(), StoreError> {
+    if !dir.exists() {
+        return Ok(());
+    }
+    remove_dir_contents(dir)?;
+    // Best-effort: empty tree may still refuse rmdir on some platforms.
+    let _ = fs::remove_dir(dir);
+    if dir.exists() {
+        let _ = fs::remove_dir_all(dir);
+    }
     Ok(())
 }
 
@@ -394,7 +417,7 @@ fn remove_dir_all_with_retry(dir: &std::path::Path) -> Result<(), StoreError> {
             Err(_) if attempt < 2 => std::thread::sleep(std::time::Duration::from_millis(150)),
             Err(_) => {
                 remove_dir_contents(dir)?;
-                fs::remove_dir_all(dir)?;
+                let _ = fs::remove_dir_all(dir);
                 return Ok(());
             }
         }

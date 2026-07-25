@@ -1,8 +1,8 @@
-GenVault v1.0.0 — Microsoft Store Upload Checklist
+GenVault v1.5.0 — Microsoft Store Upload Checklist
 =================================================
 
 PACKAGE (required)
-[ ] dist/release/v1.0.0/GenVault_1.0.0.0_x64.msix
+[ ] dist/release/v1.5.0/GenVault_1.5.0.0_x64.msix
 
 PROPERTIES (Partner Center → Properties)
 [ ] store/PROPERTIES.md             — categories, privacy Yes + URL, contact, no MR
@@ -32,7 +32,7 @@ PARTNER CENTER STEPS
 1. Create / open app in https://partner.microsoft.com/
 2. Reserve app name: GenVault
 3. Properties → fill from store/PROPERTIES.md (privacy = Yes + URL)
-4. Packages → upload GenVault_1.0.0.0_x64.msix
+4. Packages → upload GenVault_1.5.0.0_x64.msix
 5. Store listing → paste content from STORE_LISTING.md
 6. Features → attach FEATURES.txt if requested
 7. Certification → paste CERTIFICATION_NOTES.md

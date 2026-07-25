@@ -8,7 +8,7 @@
   <Identity
     Name="GenXisInnovations.GenVault"
     Publisher="CN=32E8983E-61F1-4B7F-9C58-231257C9F559"
-    Version="1.0.1.0"
+    Version="1.5.0.0"
     ProcessorArchitecture="x64" />
 
   <Properties>

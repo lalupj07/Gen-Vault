@@ -83,5 +83,5 @@ Mixed Reality: none
 1. Save the Properties page
 2. Complete Store listing from `store/STORE_LISTING.md`
 3. Paste certification notes from `store/CERTIFICATION_NOTES.md`
-4. Upload package: `dist/release/v1.0.0/GenVault_1.0.0.0_x64.msix`
+4. Upload package: `dist/release/v1.5.0/GenVault_1.5.0.0_x64.msix`
 5. Add screenshots and age ratings, then submit

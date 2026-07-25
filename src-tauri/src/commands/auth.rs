@@ -90,6 +90,47 @@ pub fn reset_local_account() -> Result<(), String> {
     store::delete_account().map_err(|e| e.to_string())
 }
 
+const VAULT_ERASE_CONFIRMATION: &str = "DELETE MY VAULT";
+static RESET_IN_PROGRESS: AtomicBool = AtomicBool::new(false);
+
+/// Permanently erase the local vault from the login screen when the user has lost
+/// both the master password and all recovery codes. Requires the exact literal
+/// confirmation phrase. This never decrypts or returns vault data — it only
+/// destroys local encrypted data so the device can start a new account.
+#[tauri::command]
+pub fn erase_vault_and_reset(confirmation: String) -> Result<(), String> {
+    if confirmation != VAULT_ERASE_CONFIRMATION {
+        return Err("Vault erase confirmation did not match.".to_string());
+    }
+
+    if RESET_IN_PROGRESS
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return Err("Vault erase is already in progress.".to_string());
+    }
+
+    let result = erase_vault_and_reset_inner();
+    RESET_IN_PROGRESS.store(false, Ordering::SeqCst);
+    result
+}
+
+fn erase_vault_and_reset_inner() -> Result<(), String> {
+    {
+        let mut guard = session().lock();
+        if let Some(ref mut key) = *guard {
+            key.zeroize();
+        }
+        *guard = None;
+    }
+
+    // Best-effort: rate-limit file lives inside the vault data dir and is wiped below.
+    let _ = rate_limit::reset();
+    store::delete_account().map_err(|e| {
+        format!("The vault could not be fully erased ({e}). Try again or reinstall the app.")
+    })
+}
+
 /// Accepts both camelCase (Tauri default IPC) and snake_case keys.
 #[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
