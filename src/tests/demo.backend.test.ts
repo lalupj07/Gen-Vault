@@ -29,3 +29,33 @@ describe('demo store + seed', () => {
     expect(again.settings.theme).toBe('light');
   });
 });
+
+describe('demo auth', () => {
+  beforeEach(async () => {
+    process.env.NEXT_PUBLIC_GENVAULT_DEMO = 'true';
+    jest.resetModules();
+    const { resetDemo } = await import('@/lib/demo/store');
+    await resetDemo();
+  });
+
+  it('unlocks with seed password and locks', async () => {
+    const { api } = await import('@/lib/api');
+    const { SEED_PASSWORD } = await import('@/lib/demo/seed');
+    expect(await api.checkAccountExists()).toBe(true);
+    expect(await api.getAuthScreenMode()).toBe('login');
+    const user = await api.unlockWithPassword(SEED_PASSWORD);
+    expect(user.username).toBe('demo');
+    expect(await api.getUser()).not.toBeNull();
+    await api.lockVault();
+    await expect(api.unlockWithPassword('wrong')).rejects.toThrow(/password|invalid/i);
+  });
+
+  it('erase_vault_and_reset restores seed', async () => {
+    const { api } = await import('@/lib/api');
+    const { SEED_PASSWORD } = await import('@/lib/demo/seed');
+    await api.unlockWithPassword(SEED_PASSWORD);
+    await api.eraseVaultAndReset('DELETE MY VAULT');
+    expect(await api.checkAccountExists()).toBe(true);
+    await api.unlockWithPassword(SEED_PASSWORD);
+  });
+});
