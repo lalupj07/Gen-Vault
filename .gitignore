@@ -43,6 +43,7 @@ Thumbs.db
 .cursor/
 .superpowers/
 .worktrees/
+worktrees/
 *.swp
 *.swo
 
