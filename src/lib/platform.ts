@@ -14,6 +14,12 @@ export async function isAndroidShell(): Promise<boolean> {
     const q = new URLSearchParams(window.location.search);
     if (q.get('mobile') === '1') return true;
   }
+  try {
+    const { isDemoMode } = await import('./demo/flag');
+    if (isDemoMode()) return true;
+  } catch {
+    // ignore
+  }
   const os = await getOsPlatform();
-  return os === 'android';
+  return os === 'android' || os === 'demo-web';
 }

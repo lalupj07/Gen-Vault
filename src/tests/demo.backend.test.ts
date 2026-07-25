@@ -94,6 +94,17 @@ describe('demo vault + otp', () => {
   });
 });
 
+describe('demo mobile shell', () => {
+  it('treats demo-web as android shell', async () => {
+    process.env.NEXT_PUBLIC_GENVAULT_DEMO = 'true';
+    jest.resetModules();
+    const { resetDemo } = await import('@/lib/demo/store');
+    await resetDemo();
+    const { isAndroidShell } = await import('@/lib/platform');
+    await expect(isAndroidShell()).resolves.toBe(true);
+  });
+});
+
 describe('demo command coverage', () => {
   it('registers every command string used by api.ts', async () => {
     process.env.NEXT_PUBLIC_GENVAULT_DEMO = 'true';
