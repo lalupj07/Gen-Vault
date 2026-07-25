@@ -339,7 +339,9 @@ export default function MobileSettings({ onRefresh, onOpenAbout }: Props) {
         <p className="m3-title-md text-accent-danger">Can&rsquo;t sign in / start fresh</p>
         <p className="text-xs text-[color:var(--md-on-surface-variant)] leading-5">
           Lost master password and recovery codes? Erase this device&rsquo;s vault and create a new
-          account. GenXis cannot restore a zero-knowledge vault.
+          account. {isDemoMode()
+            ? 'GenXis cannot restore lost demo credentials.'
+            : 'GenXis cannot restore a zero-knowledge vault.'}
         </p>
         {isDemoMode() && (
           <button
@@ -377,7 +379,9 @@ export default function MobileSettings({ onRefresh, onOpenAbout }: Props) {
         <div className="flex-1 min-w-0">
           <p className="m3-title-md">{PRODUCT.name}</p>
           <p className="text-xs text-[color:var(--md-on-surface-variant)] mt-1">
-            Offline authentication vault · AES-256-GCM · Argon2id
+            {isDemoMode()
+              ? 'Browser demo · local storage only'
+              : 'Offline authentication vault · AES-256-GCM · Argon2id'}
           </p>
           {onOpenAbout && (
             <button

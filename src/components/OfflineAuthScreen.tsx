@@ -7,6 +7,8 @@ import { COMPANY, PRODUCT } from '@/lib/company';
 import { api, invokeErrorMessage } from '@/lib/api';
 import { User, Key } from 'lucide-react';
 import AccountRecoveryScreen from './AccountRecoveryScreen';
+import DemoBadge from './DemoBadge';
+import { isDemoMode } from '@/lib/demo/flag';
 
 function VaultEmblem() {
   return (
@@ -80,6 +82,8 @@ export default function OfflineAuthScreen() {
 
   if (showRecovery && !isSetup) {
     return (
+      <>
+      <DemoBadge />
       <AccountRecoveryScreen
         username={username}
         onBack={() => setShowRecovery(false)}
@@ -92,6 +96,7 @@ export default function OfflineAuthScreen() {
           resetToSetup();
         }}
       />
+      </>
     );
   }
 
@@ -120,6 +125,8 @@ export default function OfflineAuthScreen() {
   };
 
   return (
+    <>
+    <DemoBadge />
     <div className="fixed inset-0 bg-vault-black flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -133,10 +140,19 @@ export default function OfflineAuthScreen() {
             {isSetup ? 'Create Your Vault' : 'Unlock Your Vault'}
           </h1>
           <p className="text-sm text-vault-muted">
-            {isSetup
-              ? 'Set up your offline encrypted vault with a master password'
-              : 'Enter your credentials to access your encrypted vault'}
+            {isDemoMode()
+              ? isSetup
+                ? 'Set up a demo vault with a master password'
+                : 'Enter your credentials to access the demo vault'
+              : isSetup
+                ? 'Set up your offline encrypted vault with a master password'
+                : 'Enter your credentials to access your encrypted vault'}
           </p>
+          {isDemoMode() && (
+            <p className="mt-2 text-sm text-vault-muted">
+              Browser demo only — not encrypted like the real GenVault app. Do not store real secrets.
+            </p>
+          )}
           <p className="text-[10px] text-cyber-cyan/70 mt-2">{PRODUCT.tagline}</p>
           <p className="text-[10px] text-vault-muted/60 mt-1">{COMPANY.name} · v{PRODUCT.version}</p>
         </div>
@@ -246,7 +262,9 @@ export default function OfflineAuthScreen() {
 
         <div className="mt-6 text-center space-y-1">
           <p className="text-[10px] text-vault-muted/60">
-            🔒 Zero-Knowledge Architecture • AES-256-GCM Encryption
+            {isDemoMode()
+              ? 'Browser demo — not encrypted like the production app'
+              : '🔒 Zero-Knowledge Architecture • AES-256-GCM Encryption'}
           </p>
           <p className="text-[10px] text-vault-muted/50">
             {COMPANY.copyright} · {COMPANY.licenses.join(' & ')}
@@ -255,5 +273,6 @@ export default function OfflineAuthScreen() {
       </motion.div>
 
     </div>
+    </>
   );
 }

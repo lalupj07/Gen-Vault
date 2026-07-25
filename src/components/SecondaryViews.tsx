@@ -25,6 +25,7 @@ import {
 import { useI18n } from '@/lib/i18n';
 import { onShortcut } from '@/lib/shortcuts';
 import QRCode from 'qrcode';
+import { isDemoMode } from '@/lib/demo/flag';
 
 const container = {
   hidden: { opacity: 0 },
@@ -244,7 +245,13 @@ export function VaultView() {
 
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
-      <SectionHeader icon={Vault} title="Secure Vault" subtitle="AES-256-GCM encrypted credential storage — Zero-knowledge architecture" />
+      <SectionHeader
+        icon={Vault}
+        title="Secure Vault"
+        subtitle={isDemoMode()
+          ? 'Browser demo credential storage — not production encryption'
+          : 'AES-256-GCM encrypted credential storage — Zero-knowledge architecture'}
+      />
 
       <div className="grid grid-cols-2 gap-4">
         <GlassCard><EntryHistoryPanel /></GlassCard>
@@ -257,8 +264,10 @@ export function VaultView() {
             <Lock className="w-5 h-5 text-cyber-cyan" />
             <span className="text-sm font-medium text-vault-light">Encryption Status</span>
           </div>
-          <div className="text-2xl font-bold text-cyber-emerald mb-1">Active</div>
-          <p className="text-[11px] text-vault-muted">AES-256-GCM with Argon2id key derivation</p>
+          <div className="text-2xl font-bold text-cyber-emerald mb-1">{isDemoMode() ? 'Demo' : 'Active'}</div>
+          <p className="text-[11px] text-vault-muted">
+            {isDemoMode() ? 'Demo storage — not encrypted at rest' : 'AES-256-GCM with Argon2id key derivation'}
+          </p>
         </GlassCard>
         <GlassCard>
           <div className="flex items-center gap-3 mb-3">
@@ -313,7 +322,9 @@ export function VaultView() {
               {['General', 'Work', 'Development', 'Cloud', 'Communication', 'Security', 'Social', 'Finance'].map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
-          <label className="block mt-3 text-xs text-vault-muted">Notes (encrypted at rest)</label>
+          <label className="block mt-3 text-xs text-vault-muted">
+            {isDemoMode() ? 'Notes' : 'Notes (encrypted at rest)'}
+          </label>
           {!editNotesRevealed ? (
             <button
               type="button"
@@ -337,7 +348,9 @@ export function VaultView() {
           )}
           <div className="mt-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-vault-light">Attachments (encrypted)</span>
+              <span className="text-xs font-medium text-vault-light">
+                {isDemoMode() ? 'Attachments' : 'Attachments (encrypted)'}
+              </span>
               <label className="text-xs px-2 py-1 rounded-lg bg-cyber-purple/10 text-cyber-purple border border-cyber-purple/20 cursor-pointer hover:bg-cyber-purple/20">
                 {attachLoading ? 'Uploading...' : 'Add file'}
                 <input type="file" className="hidden" disabled={attachLoading}

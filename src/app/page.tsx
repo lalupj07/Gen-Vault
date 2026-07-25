@@ -27,6 +27,7 @@ import { isWelcomeTourDone, markWelcomeTourDone, resetWelcomeTour } from '@/lib/
 import { isAndroidShell } from '@/lib/platform';
 import MobileShell from '@/components/mobile/MobileShell';
 import DemoBadge from '@/components/DemoBadge';
+import { isDemoMode } from '@/lib/demo/flag';
 
 export default function Home() {
   const router = useRouter();
@@ -355,12 +356,14 @@ export default function Home() {
           <div className="flex items-center gap-3">
             <div className="w-2 h-2 rounded-full bg-cyber-emerald animate-pulse" />
             <span className="text-xs text-vault-muted">
-              Secure Session Active — Encrypted Channel Established
+              {isDemoMode()
+                ? 'Demo session active — browser storage only'
+                : 'Secure Session Active — Encrypted Channel Established'}
             </span>
           </div>
           <div className="flex items-center gap-4">
             <span className="text-[10px] font-mono text-vault-muted/60">
-              AES-256-GCM | Argon2id | TOTP
+              {isDemoMode() ? 'Demo mode · local only' : 'AES-256-GCM | Argon2id | TOTP'}
             </span>
             {user && (
               <span className="text-[10px] text-vault-muted">
@@ -369,7 +372,9 @@ export default function Home() {
             )}
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-cyber-emerald/10 border border-cyber-emerald/20">
               <div className="w-1.5 h-1.5 rounded-full bg-cyber-emerald" />
-              <span className="text-[10px] text-cyber-emerald font-medium">Protected</span>
+              <span className="text-[10px] text-cyber-emerald font-medium">
+                {isDemoMode() ? 'Demo' : 'Protected'}
+              </span>
             </div>
             <button
               onClick={logOut}
