@@ -26,6 +26,8 @@
   &nbsp;•&nbsp;
   📦 <a href="#-download">Download</a>
   &nbsp;•&nbsp;
+  🧪 <a href="#-web-demo-testers">Web demo</a>
+  &nbsp;•&nbsp;
   🔒 <a href="#-security">Security</a>
   &nbsp;•&nbsp;
   📖 <a href="#-overview">About</a>
@@ -63,6 +65,23 @@ Built with **Tauri 2**, **Rust**, and **Next.js** for a fast desktop shell on Wi
 | **Android** | Release soon | Google Play — coming soon |
 
 Tester / CI builds: [GitHub Releases](https://github.com/lalupj07/Gen-Vault/releases) (binaries are not stored in git).
+
+---
+
+## 🧪 Web demo (testers)
+
+Try the **Android-style UI in a browser** (no APK install):
+
+**https://web-demo-vercel.vercel.app**
+
+| | |
+|--|--|
+| Unlock password | `DemoVault1!` |
+| What it is | Browser sandbox for UI / flow testing |
+| What it is **not** | The real GenVault app — **do not enter real secrets** |
+| Demo code branch | [`feature/web-demo-vercel`](https://github.com/lalupj07/Gen-Vault/tree/feature/web-demo-vercel) (kept off `main` on purpose) |
+
+Real Windows / Android builds remain the only path for production crypto and secure storage.
 
 ---
 
