@@ -76,3 +76,4 @@ secrets/
 *.mobileprovision
 *.snk
 *.cer
+.vercel

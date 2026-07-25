@@ -9,7 +9,9 @@ Static browser demo of GenVault UI and flows. **Not for real secrets** — data 
 | Root Directory | `.` |
 | Build Command | `npm run build` |
 | Output Directory | `out` |
-| Framework Preset | Next.js |
+| Framework Preset | **Other** (static site — not Next.js) |
+
+This app uses Next.js `output: 'export'`, which writes static files to `out/`. Do **not** use the Next.js framework preset: Vercel would look for `.next/routes-manifest.json` and fail. `vercel.json` sets `"framework": null` so the deploy is treated as a static export.
 
 ## Environment variables
 
@@ -23,7 +25,7 @@ Without this flag, the app builds as the Tauri static export and does not enable
 
 ## Tester access
 
-**Production URL:** pending operator deploy (see below).
+**Production URL:** https://web-demo-vercel.vercel.app
 
 After **Reset demo** (or first visit), unlock with:
 
@@ -51,15 +53,19 @@ Open the URL printed by `serve` (typically `http://localhost:3000`).
 
 ## Deploy (operator)
 
-Production URL is **not live yet**. Run from this worktree after setting env in the Vercel dashboard:
+Production URL is live at **https://web-demo-vercel.vercel.app**. Redeploy from this worktree:
 
 ```bash
 npx vercel --prod
 ```
 
-Ensure `NEXT_PUBLIC_GENVAULT_DEMO=true` is set for Production and Preview.
+Ensure `NEXT_PUBLIC_GENVAULT_DEMO=true` is set for Production and Preview (dashboard or `vercel env add`).
 
-**2026-07-25 attempt:** `npx vercel --prod` created project `lalu-james-projects/web-demo-vercel` but the build failed: Vercel Next.js integration expects `.next/routes-manifest.json`, while this app static-exports to `out/`. Operator should either remove `"framework": "nextjs"` from `vercel.json` and treat the deploy as a static site, or adjust Vercel project settings (Output Directory `out`, Framework Preset **Other**) before retrying. Paste the stable production URL here once deploy succeeds.
+**2026-07-25 fix:** Removed `"framework": "nextjs"` from `vercel.json` (now `"framework": null`). Vercel deploys `out/` as a static site. Set Framework Preset to **Other** in the dashboard if the project was created with Next.js.
+
+**2026-07-25 attempt (before fix):** `npx vercel --prod` created project `lalu-james-projects/web-demo-vercel` but the build failed: Vercel Next.js integration expects `.next/routes-manifest.json`, while this app static-exports to `out/`.
+
+**2026-07-25 deploy (after fix):** Production alias https://web-demo-vercel.vercel.app — set `NEXT_PUBLIC_GENVAULT_DEMO=true` in Vercel dashboard before next redeploy (not yet configured on project).
 
 ## Security notes
 
