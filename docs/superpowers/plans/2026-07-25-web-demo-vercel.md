@@ -537,14 +537,15 @@ describe('demo auth', () => {
     const { api } = await import('@/lib/api');
     const { SEED_PASSWORD } = await import('@/lib/demo/seed');
     await api.unlockWithPassword(SEED_PASSWORD);
-    await api.eraseVaultAndReset('ERASE'); // use same confirmation string the real UI sends — check Offline/auth UI
+    await api.eraseVaultAndReset('DELETE MY VAULT'); // matches VAULT_ERASE_CONFIRMATION in src/lib/vault-reset.ts
     expect(await api.checkAccountExists()).toBe(true);
     await api.unlockWithPassword(SEED_PASSWORD);
   });
 });
 ```
 
-**Before coding erase:** grep `eraseVaultAndReset` / `erase_vault_and_reset` confirmation string in `src/` and use that exact string in the test and handler.
+
+Auth handler for `erase_vault_and_reset`: reject unless `args.confirmation === 'DELETE MY VAULT'`, then `resetDemo()` and replace state with the fresh seed.
 
 - [ ] **Step 2: Run — expect FAIL (`Demo handler not implemented`)**
 
