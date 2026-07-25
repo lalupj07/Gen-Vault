@@ -65,7 +65,7 @@ Ensure `NEXT_PUBLIC_GENVAULT_DEMO=true` is set for Production and Preview (dashb
 
 **2026-07-25 attempt (before fix):** `npx vercel --prod` created project `lalu-james-projects/web-demo-vercel` but the build failed: Vercel Next.js integration expects `.next/routes-manifest.json`, while this app static-exports to `out/`.
 
-**2026-07-25 deploy (after fix):** Production alias https://web-demo-vercel.vercel.app — set `NEXT_PUBLIC_GENVAULT_DEMO=true` in Vercel dashboard before next redeploy (not yet configured on project).
+**2026-07-25 deploy (after fix + env):** Production alias https://web-demo-vercel.vercel.app with `NEXT_PUBLIC_GENVAULT_DEMO=true` on Production and Preview. Confirmed client bundle includes demo seed/`genvault-demo` backend.
 
 ## Security notes
 
