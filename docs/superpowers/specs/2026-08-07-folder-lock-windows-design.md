@@ -1,7 +1,7 @@
 # GenVault Folder Lock (Windows) — Design
 
 **Date:** 2026-08-07  
-**Status:** Approved — implementation in progress  
+**Status:** Implemented (Windows v1)  
 **Product:** GenVault (GenXis Innovations)  
 **Platform:** Windows desktop (Tauri 2) only for v1  
 **Related:** First module in the multi-module “lock suite” roadmap; does **not** implement File Lock, Media Vault, USB Vault, or File Shredder.

@@ -1,13 +1,27 @@
 //! Tauri commands for Folder Lock (Windows).
 
 use std::path::PathBuf;
+use std::sync::OnceLock;
 
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 
 use crate::commands::get_key;
+use crate::folder_lock::deep_link::FolderLockDeepLink;
 use crate::folder_lock::service::{FolderLockService, LockedFolderPublic, ServiceError};
 use crate::folder_lock::store::ActivityRow;
 use crate::store;
+
+static PENDING_DEEP_LINK: OnceLock<Mutex<Option<FolderLockDeepLink>>> = OnceLock::new();
+
+pub(crate) fn pending_deep_link() -> &'static Mutex<Option<FolderLockDeepLink>> {
+    PENDING_DEEP_LINK.get_or_init(|| Mutex::new(None))
+}
+
+/// Store a deep link from process args (called at startup).
+pub fn stash_deep_link(link: FolderLockDeepLink) {
+    *pending_deep_link().lock() = Some(link);
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FolderLockSettings {
@@ -175,4 +189,10 @@ pub fn folder_lock_crash_recover() -> Result<(), String> {
     };
     let _ = svc.wipe_orphan_staging();
     Ok(())
+}
+
+/// Take a pending `genvault://folder-lock` deep link (if any).
+#[tauri::command]
+pub fn folder_lock_take_deep_link() -> Option<FolderLockDeepLink> {
+    pending_deep_link().lock().take()
 }

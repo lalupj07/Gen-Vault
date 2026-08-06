@@ -40,6 +40,11 @@ export default function Home() {
   const [appState, setAppState] = useState<AppState>(defaultAppState);
   const [vaultEntries, setVaultEntries] = useState<ApiVaultEntry[]>([]);
   const [androidShell, setAndroidShell] = useState(false);
+  const [folderLockPrefill, setFolderLockPrefill] = useState<{
+    action: string;
+    path: string | null;
+    id: string | null;
+  } | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsBootLoading(false), 1800);
@@ -89,6 +94,38 @@ export default function Home() {
     }, 700);
     return () => clearTimeout(timer);
   }, [isAuthenticated, vaultLocked, user?.isOnboarded]);
+
+  // Folder Lock deep links (genvault://folder-lock?...)
+  useEffect(() => {
+    if (!isAuthenticated || vaultLocked) return;
+    let unlisten: (() => void) | undefined;
+    (async () => {
+      try {
+        const pending = await api.folderLockTakeDeepLink();
+        if (pending) {
+          setFolderLockPrefill(pending);
+          setActiveView('folder-lock');
+        }
+      } catch {
+        /* not Windows / unavailable */
+      }
+      try {
+        const { listen } = await import('@tauri-apps/api/event');
+        unlisten = await listen<{ action: string; path: string | null; id: string | null }>(
+          'folder-lock-deep-link',
+          (ev) => {
+            setFolderLockPrefill(ev.payload);
+            setActiveView('folder-lock');
+          },
+        );
+      } catch {
+        /* browser / no Tauri */
+      }
+    })();
+    return () => {
+      unlisten?.();
+    };
+  }, [isAuthenticated, vaultLocked]);
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -203,7 +240,12 @@ export default function Home() {
       case 'vault':
         return <VaultView />;
       case 'folder-lock':
-        return <FolderLockView />;
+        return (
+          <FolderLockView
+            prefill={folderLockPrefill}
+            onPrefillConsumed={() => setFolderLockPrefill(null)}
+          />
+        );
       case 'devices':
         return <DevicesView />;
       case 'sessions':

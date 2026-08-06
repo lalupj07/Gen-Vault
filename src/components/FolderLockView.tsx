@@ -42,7 +42,13 @@ function formatBytes(n: number): string {
   return `${(n / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
-export default function FolderLockView() {
+export default function FolderLockView({
+  prefill,
+  onPrefillConsumed,
+}: {
+  prefill?: { action: string; path: string | null; id: string | null } | null;
+  onPrefillConsumed?: () => void;
+}) {
   const [folders, setFolders] = useState<LockedFolder[]>([]);
   const [activity, setActivity] = useState<FolderLockActivity[]>([]);
   const [settings, setSettings] = useState<FolderLockSettings>({ auto_lock_mins: 15 });
@@ -163,6 +169,17 @@ export default function FolderLockView() {
       setBusy(false);
     }
   };
+
+  useEffect(() => {
+    if (!prefill) return;
+    if (prefill.path) setLockPath(prefill.path);
+    if (prefill.action === 'unlock' && prefill.id) {
+      void handleUnlock(prefill.id).finally(() => onPrefillConsumed?.());
+    } else {
+      onPrefillConsumed?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- apply once per prefill payload
+  }, [prefill]);
 
   const handleRelock = async (id: string) => {
     setBusy(true);

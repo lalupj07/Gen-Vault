@@ -346,4 +346,18 @@ Remove-Item -Recurse -Force .next, out, src-tauri/target; npm ci; npm run tauri:
 
 ---
 
+## Folder Lock (Windows shell)
+
+After installing a desktop build, register the Explorer context menu + `genvault://` protocol (current user):
+
+```powershell
+cd src-tauri\windows\shell
+.\Register-FolderLockShell.ps1 -ExePath "C:\path\to\GenVault.exe"
+```
+
+Unregister on uninstall: `.\Unregister-FolderLockShell.ps1`  
+Details: `src-tauri/windows/shell/README.md`
+
+---
+
 **Built with ❤️ by GenXis Innovation**

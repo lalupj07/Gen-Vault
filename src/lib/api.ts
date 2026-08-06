@@ -426,6 +426,8 @@ export const api = {
   folderLockSettingsSet: (autoLockMins: number) =>
     invoke<FolderLockSettings>('folder_lock_settings_set', { autoLockMins }),
   folderLockCrashRecover: () => invoke<void>('folder_lock_crash_recover'),
+  folderLockTakeDeepLink: () =>
+    invoke<FolderLockDeepLink | null>('folder_lock_take_deep_link'),
 };
 
 export interface LockedFolder {
@@ -450,6 +452,12 @@ export interface FolderLockActivity {
 
 export interface FolderLockSettings {
   auto_lock_mins: number;
+}
+
+export interface FolderLockDeepLink {
+  action: string;
+  path: string | null;
+  id: string | null;
 }
 
 export { generateTotpCode, verifyTotpCode, generateTotpSecret };

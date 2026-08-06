@@ -1,6 +1,7 @@
 //! Folder Lock — Windows local NTFS folder encryption (no drivers).
 
 pub mod crypto_files;
+pub mod deep_link;
 pub mod policy;
 pub mod service;
 pub mod store;

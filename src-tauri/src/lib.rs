@@ -23,6 +23,7 @@ mod usb_drives;
 pub mod vault_db;
 
 use commands::*;
+use tauri::Emitter;
 
 #[cfg(target_os = "android")]
 use tauri::Manager;
@@ -45,6 +46,11 @@ pub fn run() {
             #[cfg(windows)]
             {
                 let _ = folder_lock_crash_recover();
+                let args: Vec<String> = std::env::args().collect();
+                if let Some(link) = folder_lock::deep_link::find_in_args(&args) {
+                    stash_deep_link(link.clone());
+                    let _ = app.emit("folder-lock-deep-link", &link);
+                }
             }
             let _ = app;
             Ok(())
@@ -232,6 +238,7 @@ pub fn run() {
             folder_lock_settings_get,
             folder_lock_settings_set,
             folder_lock_crash_recover,
+            folder_lock_take_deep_link,
             // Utility
             get_app_version,
             get_platform,
