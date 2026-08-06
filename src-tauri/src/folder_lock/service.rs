@@ -43,7 +43,8 @@ pub enum ServiceError {
 
 impl From<std::io::Error> for ServiceError {
     fn from(e: std::io::Error) -> Self {
-        if e.kind() == std::io::ErrorKind::PermissionDenied {
+        // Windows often reports ERROR_ACCESS_DENIED (5) as Uncategorized/Other, not PermissionDenied.
+        if e.kind() == std::io::ErrorKind::PermissionDenied || e.raw_os_error() == Some(5) {
             ServiceError::AccessDenied
         } else {
             ServiceError::Io(e)
@@ -123,9 +124,9 @@ impl FolderLockService {
             return Err(ServiceError::NeedsLargeConfirm { size_bytes });
         }
 
-        // Preflight: clear read-only and confirm we can rewrite/delete before encrypting.
+        // Preflight: clear read-only on every file and directory, then probe write access.
+        prepare_tree_writable(src)?;
         for (abs, _) in &files {
-            clear_readonly(abs)?;
             probe_write_access(abs)?;
         }
 
@@ -278,6 +279,10 @@ impl FolderLockService {
             let out = staging.join(rel.replace('/', std::path::MAIN_SEPARATOR_STR));
             if let Some(parent) = out.parent() {
                 fs::create_dir_all(parent)?;
+                let _ = prepare_writable(parent);
+            }
+            if out.exists() {
+                prepare_writable(&out)?;
             }
             fs::write(&out, plain)?;
         }
@@ -369,9 +374,10 @@ impl FolderLockService {
         };
 
         let dest = PathBuf::from(&row.original_path);
+        prepare_tree_writable(&dest).or_else(|_| prepare_writable(&dest))?;
         // Clear stub markers if present.
-        let _ = fs::remove_file(dest.join("README.txt"));
-        let _ = fs::remove_file(dest.join(".genvault-locked"));
+        let _ = remove_path_if_exists(&dest.join("README.txt"));
+        let _ = remove_path_if_exists(&dest.join(".genvault-locked"));
         fs::create_dir_all(&dest)?;
 
         for rel in &rel_paths {
@@ -389,6 +395,10 @@ impl FolderLockService {
             let out = dest.join(rel.replace('/', std::path::MAIN_SEPARATOR_STR));
             if let Some(parent) = out.parent() {
                 fs::create_dir_all(parent)?;
+                let _ = prepare_writable(parent);
+            }
+            if out.exists() {
+                prepare_writable(&out)?;
             }
             fs::write(&out, plain)?;
         }
@@ -457,13 +467,19 @@ fn collect_files(root: &Path) -> Result<Vec<(PathBuf, u64)>, ServiceError> {
 }
 
 fn write_stub(dir: &Path, id: &str) -> Result<(), ServiceError> {
+    prepare_writable(dir)?;
     fs::create_dir_all(dir)?;
+    let marker = dir.join(".genvault-locked");
+    let readme = dir.join("README.txt");
+    if marker.exists() {
+        prepare_writable(&marker)?;
+    }
+    if readme.exists() {
+        prepare_writable(&readme)?;
+    }
+    fs::write(&marker, format!("{id}\n"))?;
     fs::write(
-        dir.join(".genvault-locked"),
-        format!("{id}\n"),
-    )?;
-    fs::write(
-        dir.join("README.txt"),
+        &readme,
         format!(
             "This folder is locked by GenVault Folder Lock.\n\
              Folder id: {id}\n\
@@ -473,7 +489,81 @@ fn write_stub(dir: &Path, id: &str) -> Result<(), ServiceError> {
     Ok(())
 }
 
-fn clear_readonly(path: &Path) -> Result<(), ServiceError> {
+/// Clear read-only (and ensure path is mutable) for a file or directory.
+fn prepare_writable(path: &Path) -> Result<(), ServiceError> {
+    if !path.exists() {
+        return Ok(());
+    }
+    #[cfg(windows)]
+    {
+        clear_readonly_win(path)?;
+    }
+    #[cfg(not(windows))]
+    {
+        clear_readonly_std(path)?;
+    }
+    Ok(())
+}
+
+/// Recursively clear read-only on every file and directory under `root` (inclusive).
+fn prepare_tree_writable(root: &Path) -> Result<(), ServiceError> {
+    if !root.exists() {
+        return Ok(());
+    }
+    if root.is_file() {
+        return prepare_writable(root);
+    }
+    fn walk(dir: &Path) -> Result<(), ServiceError> {
+        prepare_writable(dir)?;
+        let entries: Vec<_> = fs::read_dir(dir)?.collect();
+        for entry in entries {
+            let entry = entry?;
+            let path = entry.path();
+            let ft = entry.file_type()?;
+            if ft.is_dir() {
+                walk(&path)?;
+            } else if ft.is_file() {
+                prepare_writable(&path)?;
+            }
+        }
+        Ok(())
+    }
+    walk(root)
+}
+
+#[cfg(windows)]
+fn clear_readonly_win(path: &Path) -> Result<(), ServiceError> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows::core::PCWSTR;
+    use windows::Win32::Storage::FileSystem::{
+        GetFileAttributesW, SetFileAttributesW, FILE_ATTRIBUTE_READONLY, FILE_FLAGS_AND_ATTRIBUTES,
+        INVALID_FILE_ATTRIBUTES,
+    };
+
+    let wide: Vec<u16> = path
+        .as_os_str()
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
+    let attrs = unsafe { GetFileAttributesW(PCWSTR(wide.as_ptr())) };
+    if attrs == INVALID_FILE_ATTRIBUTES {
+        return Err(std::io::Error::last_os_error().into());
+    }
+    let readonly = FILE_ATTRIBUTE_READONLY.0;
+    if attrs & readonly != 0 {
+        let cleared = FILE_FLAGS_AND_ATTRIBUTES(attrs & !readonly);
+        unsafe { SetFileAttributesW(PCWSTR(wide.as_ptr()), cleared) }.map_err(|e| {
+            ServiceError::Other(format!(
+                "failed to clear read-only on {}: {e}",
+                path.display()
+            ))
+        })?;
+    }
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn clear_readonly_std(path: &Path) -> Result<(), ServiceError> {
     let meta = fs::metadata(path)?;
     let mut perms = meta.permissions();
     if perms.readonly() {
@@ -484,12 +574,29 @@ fn clear_readonly(path: &Path) -> Result<(), ServiceError> {
 }
 
 fn probe_write_access(path: &Path) -> Result<(), ServiceError> {
+    prepare_writable(path)?;
     OpenOptions::new().write(true).open(path)?;
     Ok(())
 }
 
+fn remove_path_if_exists(path: &Path) -> Result<(), ServiceError> {
+    if !path.exists() {
+        return Ok(());
+    }
+    prepare_writable(path)?;
+    if path.is_dir() {
+        wipe_dir_tree(path)?;
+    } else {
+        fs::remove_file(path)?;
+    }
+    Ok(())
+}
+
 fn remove_original_file(path: &Path) -> Result<(), ServiceError> {
-    clear_readonly(path)?;
+    prepare_writable(path)?;
+    if let Some(parent) = path.parent() {
+        prepare_writable(parent)?;
+    }
     secure_wipe_file(path)?;
     fs::remove_file(path)?;
     Ok(())
@@ -497,7 +604,7 @@ fn remove_original_file(path: &Path) -> Result<(), ServiceError> {
 
 /// One-pass zero overwrite then truncate (spec: one pass zeros).
 fn secure_wipe_file(path: &Path) -> Result<(), ServiceError> {
-    clear_readonly(path)?;
+    prepare_writable(path)?;
     let meta = fs::metadata(path)?;
     let len = meta.len() as usize;
     if len == 0 {
@@ -519,6 +626,7 @@ fn wipe_dir_tree(path: &Path) -> Result<(), ServiceError> {
     if !path.exists() {
         return Ok(());
     }
+    prepare_tree_writable(path)?;
     if path.is_file() {
         secure_wipe_file(path)?;
         fs::remove_file(path)?;
@@ -531,16 +639,18 @@ fn wipe_dir_tree(path: &Path) -> Result<(), ServiceError> {
             wipe_dir_tree(&p)?;
         } else {
             secure_wipe_file(&p)?;
-            let _ = fs::remove_file(&p);
+            fs::remove_file(&p)?;
         }
     }
-    let _ = fs::remove_dir_all(path);
+    prepare_writable(path)?;
+    fs::remove_dir(path)?;
     Ok(())
 }
 
 fn remove_empty_dirs_bottom_up(root: &Path) -> Result<(), ServiceError> {
     fn walk(dir: &Path, root: &Path) -> Result<(), ServiceError> {
-        for entry in fs::read_dir(dir)? {
+        let entries: Vec<_> = fs::read_dir(dir)?.collect();
+        for entry in entries {
             let entry = entry?;
             let path = entry.path();
             if path.is_dir() {
@@ -548,7 +658,7 @@ fn remove_empty_dirs_bottom_up(root: &Path) -> Result<(), ServiceError> {
             }
         }
         if dir != root {
-            // remove_dir fails if not empty — ignore
+            prepare_writable(dir)?;
             let _ = fs::remove_dir(dir);
         }
         Ok(())
@@ -600,16 +710,20 @@ mod tests {
     }
 
     #[test]
-    fn lock_clears_readonly_files() {
+    fn lock_clears_readonly_files_and_dirs() {
         let tmp = tempfile::tempdir().unwrap();
         let data = tmp.path().join("data");
         let src = tmp.path().join("rodocs");
-        fs::create_dir_all(&src).unwrap();
-        let f = src.join("readonly.txt");
+        let nested = src.join("nested");
+        fs::create_dir_all(&nested).unwrap();
+        let f = nested.join("readonly.txt");
         fs::write(&f, b"secret").unwrap();
         let mut perms = fs::metadata(&f).unwrap().permissions();
         perms.set_readonly(true);
         fs::set_permissions(&f, perms).unwrap();
+        let mut dperms = fs::metadata(&nested).unwrap().permissions();
+        dperms.set_readonly(true);
+        fs::set_permissions(&nested, dperms).unwrap();
         assert!(fs::metadata(&f).unwrap().permissions().readonly());
 
         let svc = FolderLockService::new(data).unwrap();
@@ -618,7 +732,19 @@ mod tests {
         assert!(!f.exists());
         assert!(src.join(".genvault-locked").is_file());
         svc.restore_to_original(&row.id, &vault).unwrap();
-        assert_eq!(fs::read_to_string(src.join("readonly.txt")).unwrap(), "secret");
+        assert_eq!(
+            fs::read_to_string(src.join("nested").join("readonly.txt")).unwrap(),
+            "secret"
+        );
+    }
+
+    #[test]
+    fn io_error_5_maps_to_access_denied() {
+        let err = std::io::Error::from_raw_os_error(5);
+        match ServiceError::from(err) {
+            ServiceError::AccessDenied => {}
+            other => panic!("expected AccessDenied, got {other}"),
+        }
     }
 
     #[test]
