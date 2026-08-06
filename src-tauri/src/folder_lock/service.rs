@@ -24,7 +24,11 @@ pub enum ServiceError {
     #[error(transparent)]
     Crypto(#[from] crypto::CryptoError),
     #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
+    Io(std::io::Error),
+    #[error(
+        "Access denied — close programs using files in this folder, clear read-only attributes, then retry"
+    )]
+    AccessDenied,
     #[error("Folder is larger than 2 GB; confirm to proceed")]
     NeedsLargeConfirm { size_bytes: u64 },
     #[error("Another folder is already unlocked in staging")]
@@ -35,6 +39,16 @@ pub enum ServiceError {
     NotFound,
     #[error("{0}")]
     Other(String),
+}
+
+impl From<std::io::Error> for ServiceError {
+    fn from(e: std::io::Error) -> Self {
+        if e.kind() == std::io::ErrorKind::PermissionDenied {
+            ServiceError::AccessDenied
+        } else {
+            ServiceError::Io(e)
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -109,6 +123,12 @@ impl FolderLockService {
             return Err(ServiceError::NeedsLargeConfirm { size_bytes });
         }
 
+        // Preflight: clear read-only and confirm we can rewrite/delete before encrypting.
+        for (abs, _) in &files {
+            clear_readonly(abs)?;
+            probe_write_access(abs)?;
+        }
+
         let id = Uuid::new_v4().to_string();
         let display_name = src
             .file_name()
@@ -165,8 +185,11 @@ impl FolderLockService {
 
         // Wipe originals then remove empty dirs.
         for (abs, _) in &files {
-            secure_wipe_file(abs)?;
-            let _ = fs::remove_file(abs);
+            if let Err(e) = remove_original_file(abs) {
+                // Leave source tree intact for files not yet removed; drop orphan ciphertext.
+                let _ = fs::remove_dir_all(&cipher_root);
+                return Err(e);
+            }
         }
         remove_empty_dirs_bottom_up(src)?;
 
@@ -450,8 +473,31 @@ fn write_stub(dir: &Path, id: &str) -> Result<(), ServiceError> {
     Ok(())
 }
 
+fn clear_readonly(path: &Path) -> Result<(), ServiceError> {
+    let meta = fs::metadata(path)?;
+    let mut perms = meta.permissions();
+    if perms.readonly() {
+        perms.set_readonly(false);
+        fs::set_permissions(path, perms)?;
+    }
+    Ok(())
+}
+
+fn probe_write_access(path: &Path) -> Result<(), ServiceError> {
+    OpenOptions::new().write(true).open(path)?;
+    Ok(())
+}
+
+fn remove_original_file(path: &Path) -> Result<(), ServiceError> {
+    clear_readonly(path)?;
+    secure_wipe_file(path)?;
+    fs::remove_file(path)?;
+    Ok(())
+}
+
 /// One-pass zero overwrite then truncate (spec: one pass zeros).
 fn secure_wipe_file(path: &Path) -> Result<(), ServiceError> {
+    clear_readonly(path)?;
     let meta = fs::metadata(path)?;
     let len = meta.len() as usize;
     if len == 0 {
@@ -551,6 +597,28 @@ mod tests {
         );
         assert!(!svc.cipher_dir(&pub_row.id).exists());
         assert!(svc.list().unwrap().is_empty());
+    }
+
+    #[test]
+    fn lock_clears_readonly_files() {
+        let tmp = tempfile::tempdir().unwrap();
+        let data = tmp.path().join("data");
+        let src = tmp.path().join("rodocs");
+        fs::create_dir_all(&src).unwrap();
+        let f = src.join("readonly.txt");
+        fs::write(&f, b"secret").unwrap();
+        let mut perms = fs::metadata(&f).unwrap().permissions();
+        perms.set_readonly(true);
+        fs::set_permissions(&f, perms).unwrap();
+        assert!(fs::metadata(&f).unwrap().permissions().readonly());
+
+        let svc = FolderLockService::new(data).unwrap();
+        let vault = crypto::generate_key();
+        let row = svc.lock_folder(&src, &vault, true).unwrap();
+        assert!(!f.exists());
+        assert!(src.join(".genvault-locked").is_file());
+        svc.restore_to_original(&row.id, &vault).unwrap();
+        assert_eq!(fs::read_to_string(src.join("readonly.txt")).unwrap(), "secret");
     }
 
     #[test]

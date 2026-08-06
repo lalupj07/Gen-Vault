@@ -123,8 +123,9 @@ fn is_removable_volume(path: &Path) -> Result<bool, PolicyError> {
         return Err(PolicyError::AccessDenied);
     }
     let drive_type = unsafe { GetDriveTypeW(PCWSTR(volume.as_ptr())) };
-    // DRIVE_REMOVABLE = 2, DRIVE_CDROM = 5, DRIVE_RAMDISK = 6
-    Ok(matches!(drive_type, 2 | 5 | 6))
+    // DRIVE_REMOVABLE=2, DRIVE_REMOTE=4, DRIVE_CDROM=5, DRIVE_RAMDISK=6
+    // v1: local fixed NTFS only (reject network/mapped remote).
+    Ok(matches!(drive_type, 2 | 4 | 5 | 6))
 }
 
 #[cfg(test)]
