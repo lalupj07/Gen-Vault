@@ -25,6 +25,7 @@ const en: Dict = {
   'nav.dashboard': 'Dashboard',
   'nav.authenticator': 'Authenticator',
   'nav.vault': 'Secure Vault',
+  'nav.folderLock': 'Folder Lock',
   'nav.devices': 'Devices',
   'nav.sessions': 'Active Sessions',
   'nav.qr': 'QR Transfer',

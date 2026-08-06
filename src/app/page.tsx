@@ -16,6 +16,7 @@ import {
   HardwareKeysView, BiometricsView, ThreatDetectionView,
   RecoveryView, SettingsView, ProfileView
 } from '@/components/SecondaryViews';
+import FolderLockView from '@/components/FolderLockView';
 import { defaultAppState, type AppState } from '@/lib/store';
 import { useAuth } from '@/lib/auth';
 import { api, type VaultEntry as ApiVaultEntry } from '@/lib/api';
@@ -201,6 +202,8 @@ export default function Home() {
         return <Authenticator entries={vaultEntries as any} />;
       case 'vault':
         return <VaultView />;
+      case 'folder-lock':
+        return <FolderLockView />;
       case 'devices':
         return <DevicesView />;
       case 'sessions':
