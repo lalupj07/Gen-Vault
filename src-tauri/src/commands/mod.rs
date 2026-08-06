@@ -6,11 +6,13 @@ use crate::models::{VaultData, VaultEntry, VaultEntryPublic};
 use crate::store;
 
 pub mod auth;
+pub mod folder_lock;
 pub mod hardware_keys;
 pub mod recovery;
 pub mod vault;
 
 pub use auth::*;
+pub use folder_lock::*;
 pub use hardware_keys::*;
 pub use recovery::*;
 pub use vault::*;

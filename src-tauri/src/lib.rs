@@ -42,6 +42,10 @@ pub fn run() {
                 std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
                 app_paths::init(dir);
             }
+            #[cfg(windows)]
+            {
+                let _ = folder_lock_crash_recover();
+            }
             let _ = app;
             Ok(())
         })
@@ -216,6 +220,18 @@ pub fn run() {
             export_entry_attachment,
             list_removable_drives,
             export_backup_to_usb,
+            // Folder Lock (Windows)
+            folder_lock_list,
+            folder_lock_search,
+            folder_lock_lock,
+            folder_lock_unlock,
+            folder_lock_relock,
+            folder_lock_restore,
+            folder_lock_set_favorite,
+            folder_lock_activity,
+            folder_lock_settings_get,
+            folder_lock_settings_set,
+            folder_lock_crash_recover,
             // Utility
             get_app_version,
             get_platform,

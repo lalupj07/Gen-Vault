@@ -408,6 +408,48 @@ export const api = {
   listRemovableDrives: () => invoke<RemovableDrive[]>('list_removable_drives'),
   exportBackupToUsb: (passphrase: string, driveLetter: string) =>
     invoke<string>('export_backup_to_usb', { passphrase, driveLetter }),
+
+  folderLockList: () => invoke<LockedFolder[]>('folder_lock_list'),
+  folderLockSearch: (query: string) => invoke<LockedFolder[]>('folder_lock_search', { query }),
+  folderLockLock: (path: string, confirmLarge = false) =>
+    invoke<LockedFolder>('folder_lock_lock', { path, confirmLarge }),
+  folderLockUnlock: (id: string, openExplorer = true) =>
+    invoke<string>('folder_lock_unlock', { id, openExplorer }),
+  folderLockRelock: (id: string) => invoke<void>('folder_lock_relock', { id }),
+  folderLockRestore: (id: string) => invoke<void>('folder_lock_restore', { id }),
+  folderLockSetFavorite: (id: string, favorite: boolean) =>
+    invoke<void>('folder_lock_set_favorite', { id, favorite }),
+  folderLockActivity: (limit = 50) =>
+    invoke<FolderLockActivity[]>('folder_lock_activity', { limit }),
+  folderLockSettingsGet: () =>
+    invoke<FolderLockSettings>('folder_lock_settings_get'),
+  folderLockSettingsSet: (autoLockMins: number) =>
+    invoke<FolderLockSettings>('folder_lock_settings_set', { autoLockMins }),
+  folderLockCrashRecover: () => invoke<void>('folder_lock_crash_recover'),
 };
+
+export interface LockedFolder {
+  id: string;
+  display_name: string;
+  original_path: string;
+  status: string;
+  favorite: boolean;
+  size_bytes: number;
+  created_at: number;
+  last_locked_at: number;
+  last_unlocked_at: number | null;
+}
+
+export interface FolderLockActivity {
+  id: string;
+  folder_id: string;
+  event: string;
+  message: string;
+  timestamp: number;
+}
+
+export interface FolderLockSettings {
+  auto_lock_mins: number;
+}
 
 export { generateTotpCode, verifyTotpCode, generateTotpSecret };
