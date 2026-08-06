@@ -2,6 +2,8 @@
 
 pub mod crypto_files;
 pub mod policy;
+pub mod service;
+pub mod store;
 
 #[cfg(test)]
 mod tests {
