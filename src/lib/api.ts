@@ -428,6 +428,27 @@ export const api = {
   folderLockCrashRecover: () => invoke<void>('folder_lock_crash_recover'),
   folderLockTakeDeepLink: () =>
     invoke<FolderLockDeepLink | null>('folder_lock_take_deep_link'),
+
+  fileLockList: () => invoke<LockedFile[]>('file_lock_list'),
+  fileLockSearch: (query: string) => invoke<LockedFile[]>('file_lock_search', { query }),
+  fileLockLock: (path: string, confirmLarge = false) =>
+    invoke<LockedFile>('file_lock_lock', { path, confirmLarge }),
+  fileLockLockBatch: (paths: string[], confirmLarge = false) =>
+    invoke<FileLockBatchResult>('file_lock_lock_batch', { paths, confirmLarge }),
+  fileLockUnlock: (id: string, openExplorer = true) =>
+    invoke<string>('file_lock_unlock', { id, openExplorer }),
+  fileLockRelock: (id: string) => invoke<void>('file_lock_relock', { id }),
+  fileLockRestore: (id: string) => invoke<void>('file_lock_restore', { id }),
+  fileLockSetFavorite: (id: string, favorite: boolean) =>
+    invoke<void>('file_lock_set_favorite', { id, favorite }),
+  fileLockActivity: (limit = 50) =>
+    invoke<FileLockActivity[]>('file_lock_activity', { limit }),
+  fileLockSettingsGet: () => invoke<FileLockSettings>('file_lock_settings_get'),
+  fileLockSettingsSet: (autoLockMins: number) =>
+    invoke<FileLockSettings>('file_lock_settings_set', { autoLockMins }),
+  fileLockCrashRecover: () => invoke<void>('file_lock_crash_recover'),
+  fileLockTakeDeepLink: () =>
+    invoke<FileLockDeepLink | null>('file_lock_take_deep_link'),
 };
 
 export interface LockedFolder {
@@ -458,6 +479,32 @@ export interface FolderLockDeepLink {
   action: string;
   path: string | null;
   id: string | null;
+}
+
+export type LockedFile = LockedFolder;
+
+export interface FileLockActivity {
+  id: string;
+  file_id: string;
+  event: string;
+  message: string;
+  timestamp: number;
+}
+
+export interface FileLockSettings {
+  auto_lock_mins: number;
+}
+
+export interface FileLockDeepLink {
+  action: string;
+  path: string | null;
+  paths: string[];
+  id: string | null;
+}
+
+export interface FileLockBatchResult {
+  locked: LockedFile[];
+  failed: { path: string; error: string }[];
 }
 
 export { generateTotpCode, verifyTotpCode, generateTotpSecret };

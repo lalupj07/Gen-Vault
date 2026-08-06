@@ -7,6 +7,7 @@ pub mod crypto;
 mod entry_history;
 mod fido;
 pub mod folder_lock;
+pub mod file_lock;
 mod hello;
 mod hibp;
 mod import_export;
@@ -46,10 +47,15 @@ pub fn run() {
             #[cfg(windows)]
             {
                 let _ = folder_lock_crash_recover();
+                let _ = file_lock_crash_recover();
                 let args: Vec<String> = std::env::args().collect();
                 if let Some(link) = folder_lock::deep_link::find_in_args(&args) {
                     stash_deep_link(link.clone());
                     let _ = app.emit("folder-lock-deep-link", &link);
+                }
+                if let Some(link) = file_lock::deep_link::find_in_args(&args) {
+                    stash_file_lock_deep_link(link.clone());
+                    let _ = app.emit("file-lock-deep-link", &link);
                 }
             }
             let _ = app;
@@ -239,6 +245,20 @@ pub fn run() {
             folder_lock_settings_set,
             folder_lock_crash_recover,
             folder_lock_take_deep_link,
+            // File Lock (Windows)
+            file_lock_list,
+            file_lock_search,
+            file_lock_lock,
+            file_lock_lock_batch,
+            file_lock_unlock,
+            file_lock_relock,
+            file_lock_restore,
+            file_lock_set_favorite,
+            file_lock_activity,
+            file_lock_settings_get,
+            file_lock_settings_set,
+            file_lock_crash_recover,
+            file_lock_take_deep_link,
             // Utility
             get_app_version,
             get_platform,

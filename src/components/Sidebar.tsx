@@ -5,7 +5,7 @@ import {
   Shield, LayoutDashboard, KeyRound, Vault, Smartphone, QrCode,
   Activity, Settings, Eye, EyeOff, CloudOff, Cloud,
   HardDrive, AlertTriangle, FileKey, ChevronLeft, ChevronRight,
-  Fingerprint, RefreshCw, User, Sun, Moon, Monitor, FolderLock
+  Fingerprint, RefreshCw, User, Sun, Moon, Monitor, FolderLock, FileLock2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme, type Theme } from '@/lib/theme';
@@ -28,6 +28,7 @@ const navItems = [
   { id: 'authenticator', labelKey: 'nav.authenticator', icon: KeyRound, sectionKey: 'nav.overview' },
   { id: 'vault', labelKey: 'nav.vault', icon: Vault, sectionKey: 'nav.overview' },
   { id: 'folder-lock', labelKey: 'nav.folderLock', icon: FolderLock, sectionKey: 'nav.overview' },
+  { id: 'file-lock', labelKey: 'nav.fileLock', icon: FileLock2, sectionKey: 'nav.overview' },
   { id: 'devices', labelKey: 'nav.devices', icon: Smartphone, sectionKey: 'nav.management' },
   { id: 'sessions', labelKey: 'nav.sessions', icon: Activity, sectionKey: 'nav.management' },
   { id: 'qr-onboard', labelKey: 'nav.qr', icon: QrCode, sectionKey: 'nav.management' },

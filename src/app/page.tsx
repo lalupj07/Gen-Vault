@@ -17,6 +17,7 @@ import {
   RecoveryView, SettingsView, ProfileView
 } from '@/components/SecondaryViews';
 import FolderLockView from '@/components/FolderLockView';
+import FileLockView from '@/components/FileLockView';
 import { defaultAppState, type AppState } from '@/lib/store';
 import { useAuth } from '@/lib/auth';
 import { api, type VaultEntry as ApiVaultEntry } from '@/lib/api';
@@ -43,6 +44,12 @@ export default function Home() {
   const [folderLockPrefill, setFolderLockPrefill] = useState<{
     action: string;
     path: string | null;
+    id: string | null;
+  } | null>(null);
+  const [fileLockPrefill, setFileLockPrefill] = useState<{
+    action: string;
+    path: string | null;
+    paths?: string[];
     id: string | null;
   } | null>(null);
 
@@ -95,10 +102,11 @@ export default function Home() {
     return () => clearTimeout(timer);
   }, [isAuthenticated, vaultLocked, user?.isOnboarded]);
 
-  // Folder Lock deep links (genvault://folder-lock?...)
+  // Folder / File Lock deep links
   useEffect(() => {
     if (!isAuthenticated || vaultLocked) return;
-    let unlisten: (() => void) | undefined;
+    let unlistenFolder: (() => void) | undefined;
+    let unlistenFile: (() => void) | undefined;
     (async () => {
       try {
         const pending = await api.folderLockTakeDeepLink();
@@ -106,24 +114,37 @@ export default function Home() {
           setFolderLockPrefill(pending);
           setActiveView('folder-lock');
         }
-      } catch {
-        /* not Windows / unavailable */
-      }
+      } catch { /* ignore */ }
+      try {
+        const pending = await api.fileLockTakeDeepLink();
+        if (pending) {
+          setFileLockPrefill(pending);
+          setActiveView('file-lock');
+        }
+      } catch { /* ignore */ }
       try {
         const { listen } = await import('@tauri-apps/api/event');
-        unlisten = await listen<{ action: string; path: string | null; id: string | null }>(
+        unlistenFolder = await listen<{ action: string; path: string | null; id: string | null }>(
           'folder-lock-deep-link',
           (ev) => {
             setFolderLockPrefill(ev.payload);
             setActiveView('folder-lock');
           },
         );
-      } catch {
-        /* browser / no Tauri */
-      }
+        unlistenFile = await listen<{
+          action: string;
+          path: string | null;
+          paths: string[];
+          id: string | null;
+        }>('file-lock-deep-link', (ev) => {
+          setFileLockPrefill(ev.payload);
+          setActiveView('file-lock');
+        });
+      } catch { /* ignore */ }
     })();
     return () => {
-      unlisten?.();
+      unlistenFolder?.();
+      unlistenFile?.();
     };
   }, [isAuthenticated, vaultLocked]);
 
@@ -244,6 +265,13 @@ export default function Home() {
           <FolderLockView
             prefill={folderLockPrefill}
             onPrefillConsumed={() => setFolderLockPrefill(null)}
+          />
+        );
+      case 'file-lock':
+        return (
+          <FileLockView
+            prefill={fileLockPrefill}
+            onPrefillConsumed={() => setFileLockPrefill(null)}
           />
         );
       case 'devices':
