@@ -1,5 +1,5 @@
 use aes_gcm::{
-    aead::{Aead, KeyInit, OsRng},
+    aead::{Aead, KeyInit, OsRng, Payload},
     Aes256Gcm, Nonce,
 };
 use argon2::{Argon2, PasswordHasher, PasswordVerifier, password_hash::SaltString};
@@ -105,6 +105,53 @@ pub fn decrypt(data: &[u8], key: &[u8; 32]) -> Result<Vec<u8>, CryptoError> {
 
     cipher
         .decrypt(nonce, ciphertext)
+        .map_err(|_| CryptoError::DecryptionFailed)
+}
+
+/// Encrypt with AES-256-GCM and associated data (AAD).
+/// Returns: nonce (12 bytes) + ciphertext.
+pub fn encrypt_with_aad(data: &[u8], key: &[u8; 32], aad: &[u8]) -> Result<Vec<u8>, CryptoError> {
+    let cipher = Aes256Gcm::new_from_slice(key)
+        .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
+
+    let mut nonce_bytes = [0u8; 12];
+    OsRng.fill_bytes(&mut nonce_bytes);
+    let nonce = Nonce::from_slice(&nonce_bytes);
+
+    let ciphertext = cipher
+        .encrypt(
+            nonce,
+            Payload {
+                msg: data,
+                aad,
+            },
+        )
+        .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
+
+    let mut result = Vec::with_capacity(12 + ciphertext.len());
+    result.extend_from_slice(&nonce_bytes);
+    result.extend_from_slice(&ciphertext);
+    Ok(result)
+}
+
+/// Decrypt AES-256-GCM blob (nonce \|\| ciphertext) verifying AAD.
+pub fn decrypt_with_aad(data: &[u8], key: &[u8; 32], aad: &[u8]) -> Result<Vec<u8>, CryptoError> {
+    if data.len() < 13 {
+        return Err(CryptoError::InvalidFormat);
+    }
+
+    let cipher = Aes256Gcm::new_from_slice(key).map_err(|_| CryptoError::DecryptionFailed)?;
+    let nonce = Nonce::from_slice(&data[..12]);
+    let ciphertext = &data[12..];
+
+    cipher
+        .decrypt(
+            nonce,
+            Payload {
+                msg: ciphertext,
+                aad,
+            },
+        )
         .map_err(|_| CryptoError::DecryptionFailed)
 }
 

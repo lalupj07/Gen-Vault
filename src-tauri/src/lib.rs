@@ -6,6 +6,7 @@ pub mod commands;
 pub mod crypto;
 mod entry_history;
 mod fido;
+pub mod folder_lock;
 mod hello;
 mod hibp;
 mod import_export;
