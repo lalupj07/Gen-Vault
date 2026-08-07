@@ -869,7 +869,7 @@ export function HardwareKeysView() {
 
 // ===== Biometrics View =====
 export function BiometricsView() {
-  const { unlockMethods, vaultLocked } = useAuth();
+  const { unlockMethods, vaultLocked, refreshUnlockMethods } = useAuth();
   const [helloAvailable, setHelloAvailable] = useState(false);
   const [biometricSetting, setBiometricSetting] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -904,6 +904,7 @@ export function BiometricsView() {
       const s = await api.getSettings();
       await api.updateSettings({ ...s, biometric: true });
       setBiometricSetting(true);
+      await refreshUnlockMethods();
       setMessage('Biometric unlock enrolled (fingerprint / face / device PIN).');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Enrollment failed');
@@ -919,6 +920,7 @@ export function BiometricsView() {
       const s = await api.getSettings();
       await api.updateSettings({ ...s, biometric: false });
       setBiometricSetting(false);
+      await refreshUnlockMethods();
       setMessage('Biometric unlock removed.');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to remove');
@@ -1226,7 +1228,7 @@ export function SettingsView({ onReplayWelcomeTour }: { onReplayWelcomeTour?: ()
   const [clockDrift, setClockDrift] = useState(0);
   const [timezoneOffset, setTimezoneOffset] = useState(0);
   const { theme } = useTheme();
-  const { unlockMethods, vaultLocked } = useAuth();
+  const { unlockMethods, vaultLocked, refreshUnlockMethods } = useAuth();
 
   // Unlock method enrollment state
   const [showPasswordEnroll, setShowPasswordEnroll] = useState(false);
@@ -1319,6 +1321,7 @@ export function SettingsView({ onReplayWelcomeTour }: { onReplayWelcomeTour?: ()
     setEnrollError('');
     try {
       await api.enrollHello();
+      await refreshUnlockMethods();
     } catch (e) {
       setEnrollError(e instanceof Error ? e.message : 'Failed to enroll Windows Hello');
     }
@@ -1330,6 +1333,7 @@ export function SettingsView({ onReplayWelcomeTour }: { onReplayWelcomeTour?: ()
     setEnrollError('');
     try {
       await api.removeUnlockMethod(kind);
+      await refreshUnlockMethods();
     } catch (e) {
       setEnrollError(e instanceof Error ? e.message : 'Failed to remove unlock method');
     }

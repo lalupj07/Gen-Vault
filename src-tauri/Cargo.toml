@@ -55,6 +55,8 @@ windows = { version = "0.58", features = [
   "Win32_Security_Cryptography",
   "Win32_Foundation",
   "Win32_Storage_FileSystem",
+  "Win32_System_WinRT",
+  "Win32_UI_WindowsAndMessaging",
 ] }
 ctap-hid-fido2 = "3.5"
 

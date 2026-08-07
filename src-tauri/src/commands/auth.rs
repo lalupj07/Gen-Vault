@@ -302,12 +302,13 @@ pub fn unlock_with_pin(_pin: String) -> Result<User, String> {
 /// Biometric consent is a presence proof; VMK is recovered only from the password wrap
 /// (DPAPI Hello protector alone cannot unlock — closes same-user malware gap).
 #[tauri::command]
-pub fn unlock_with_hello(password: String) -> Result<User, String> {
+pub fn unlock_with_hello(window: tauri::WebviewWindow, password: String) -> Result<User, String> {
     rate_limit::check_allowed("unlock")?;
     if password.is_empty() {
         return Err("Master password is required with biometric unlock".to_string());
     }
-    let verified = hello::request_consent("Unlock your GenVault")?;
+    let hwnd = window_hwnd(&window)?;
+    let verified = hello::request_consent("Unlock your GenVault", hwnd)?;
     if !verified {
         let _ = rate_limit::record_failure("unlock");
         return Err("Biometric verification was not completed".to_string());
@@ -381,11 +382,12 @@ pub fn has_pin() -> Result<bool, String> {
 
 /// Enroll Windows Hello as a convenience unlock method.
 #[tauri::command]
-pub fn enroll_hello() -> Result<(), String> {
+pub fn enroll_hello(window: tauri::WebviewWindow) -> Result<(), String> {
     if !hello::is_available() {
         return Err("Biometric unlock is not available on this device".to_string());
     }
-    let verified = hello::request_consent("Enable Windows Hello for GenVault")?;
+    let hwnd = window_hwnd(&window)?;
+    let verified = hello::request_consent("Enable Windows Hello for GenVault", hwnd)?;
     if !verified {
         return Err("Biometric verification was not completed".to_string());
     }
@@ -401,6 +403,17 @@ pub fn enroll_hello() -> Result<(), String> {
         });
         Ok(())
     })
+}
+
+#[cfg(windows)]
+fn window_hwnd(window: &tauri::WebviewWindow) -> Result<isize, String> {
+    let hwnd = window.hwnd().map_err(|e| e.to_string())?;
+    Ok(hwnd.0 as isize)
+}
+
+#[cfg(not(windows))]
+fn window_hwnd(_window: &tauri::WebviewWindow) -> Result<isize, String> {
+    Ok(0)
 }
 
 /// Remove an enrolled unlock method ("password" | "pin" | "hello").
