@@ -56,14 +56,14 @@ New-Item -Path "$shellKey\command" -Force | Out-Null
 $cmd = "powershell.exe -NoProfile -WindowStyle Hidden -Command `"Start-Process 'genvault://folder-lock?action=lock&path=' + [uri]::EscapeDataString('%V')`""
 Set-ItemProperty -Path "$shellKey\command" -Name "(default)" -Value $cmd
 
-# --- Explorer context menu on files ---
-$fileKey = "HKCU:\Software\Classes\*\shell\GenVaultFileLock"
-New-Item -Path $fileKey -Force | Out-Null
-Set-ItemProperty -Path $fileKey -Name "(default)" -Value "Lock with GenVault"
-Set-ItemProperty -Path $fileKey -Name "Icon" -Value "`"$exe`""
-New-Item -Path "$fileKey\command" -Force | Out-Null
+# --- Explorer context menu on files (* = all files; use -LiteralPath) ---
+$fileKey = 'HKCU:\Software\Classes\*\shell\GenVaultFileLock'
+New-Item -LiteralPath $fileKey -Force | Out-Null
+Set-ItemProperty -LiteralPath $fileKey -Name "(default)" -Value "Lock with GenVault"
+Set-ItemProperty -LiteralPath $fileKey -Name "Icon" -Value "`"$exe`""
+New-Item -LiteralPath "$fileKey\command" -Force | Out-Null
 $fileCmd = "powershell.exe -NoProfile -WindowStyle Hidden -Command `"Start-Process 'genvault://file-lock?action=lock&path=' + [uri]::EscapeDataString('%1')`""
-Set-ItemProperty -Path "$fileKey\command" -Name "(default)" -Value $fileCmd
+Set-ItemProperty -LiteralPath "$fileKey\command" -Name "(default)" -Value $fileCmd
 
 Write-Host "Registered genvault:// protocol, Directory + file 'Lock with GenVault' verbs."
 Write-Host "Unregister with: .\Unregister-FolderLockShell.ps1"
