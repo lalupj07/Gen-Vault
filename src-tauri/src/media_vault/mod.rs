@@ -2,3 +2,4 @@
 
 pub mod policy;
 pub mod store;
+pub mod thumb;
