@@ -27,6 +27,7 @@ const en: Dict = {
   'nav.vault': 'Secure Vault',
   'nav.folderLock': 'Folder Lock',
   'nav.fileLock': 'File Lock',
+  'nav.mediaVault': 'Media Vault',
   'nav.devices': 'Devices',
   'nav.sessions': 'Active Sessions',
   'nav.qr': 'QR Transfer',

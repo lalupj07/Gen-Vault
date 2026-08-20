@@ -18,6 +18,7 @@ import {
 } from '@/components/SecondaryViews';
 import FolderLockView from '@/components/FolderLockView';
 import FileLockView from '@/components/FileLockView';
+import MediaVaultView from '@/components/MediaVaultView';
 import { defaultAppState, type AppState } from '@/lib/store';
 import { useAuth } from '@/lib/auth';
 import { api, type VaultEntry as ApiVaultEntry } from '@/lib/api';
@@ -274,6 +275,8 @@ export default function Home() {
             onPrefillConsumed={() => setFileLockPrefill(null)}
           />
         );
+      case 'media-vault':
+        return <MediaVaultView />;
       case 'devices':
         return <DevicesView />;
       case 'sessions':
