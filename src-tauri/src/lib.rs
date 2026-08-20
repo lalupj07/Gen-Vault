@@ -49,7 +49,7 @@ pub fn run() {
             {
                 let _ = wipe_folder_lock_orphans_on_startup();
                 let _ = wipe_file_lock_orphans_on_startup();
-                let _ = crate::media_vault::service::wipe_media_vault_orphans_on_startup();
+                let _ = wipe_media_vault_orphans_on_startup();
                 let args: Vec<String> = std::env::args().collect();
                 if let Some(link) = folder_lock::deep_link::find_in_args(&args) {
                     stash_deep_link(link.clone());
@@ -261,6 +261,24 @@ pub fn run() {
             file_lock_settings_set,
             file_lock_crash_recover,
             file_lock_take_deep_link,
+            // Media Vault (Windows)
+            media_vault_list,
+            media_vault_search,
+            media_vault_import,
+            media_vault_import_batch,
+            media_vault_view,
+            media_vault_relock,
+            media_vault_relock_all,
+            media_vault_delete,
+            media_vault_export,
+            media_vault_thumb,
+            media_vault_set_favorite,
+            media_vault_set_title,
+            media_vault_set_album,
+            media_vault_activity,
+            media_vault_settings_get,
+            media_vault_settings_set,
+            media_vault_crash_recover,
             // Utility
             get_app_version,
             get_platform,

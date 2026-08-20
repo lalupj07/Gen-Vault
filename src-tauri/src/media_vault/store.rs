@@ -198,6 +198,39 @@ impl MediaVaultStore {
         Ok(())
     }
 
+    pub fn update(&self, row: &MediaItemRow) -> Result<(), StoreError> {
+        let n = self.conn()?.execute(
+            r#"UPDATE media_items SET title=?2, album=?3, favorite=?4 WHERE id=?1"#,
+            params![row.id, row.title, row.album, row.favorite as i64],
+        )?;
+        if n == 0 {
+            return Err(StoreError::NotFound);
+        }
+        Ok(())
+    }
+
+    pub fn list_activity(&self, limit: usize) -> Result<Vec<ActivityRow>, StoreError> {
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(
+            r#"SELECT id, item_id, action, detail, ts
+               FROM media_vault_activity ORDER BY ts DESC LIMIT ?1"#,
+        )?;
+        let rows = stmt.query_map(params![limit as i64], |r| {
+            Ok(ActivityRow {
+                id: r.get(0)?,
+                item_id: r.get(1)?,
+                action: r.get(2)?,
+                detail: r.get(3)?,
+                ts: r.get(4)?,
+            })
+        })?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row?);
+        }
+        Ok(out)
+    }
+
     pub fn search(&self, query: &str) -> Result<Vec<MediaItemRow>, StoreError> {
         let q = query.trim();
         if q.is_empty() {

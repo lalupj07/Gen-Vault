@@ -287,6 +287,52 @@ impl MediaVaultService {
         Ok(jpeg)
     }
 
+    pub fn list(&self) -> Result<Vec<MediaItemPublic>, ServiceError> {
+        Ok(self
+            .store()?
+            .list()?
+            .iter()
+            .map(MediaItemPublic::from)
+            .collect())
+    }
+
+    pub fn search(&self, query: &str) -> Result<Vec<MediaItemPublic>, ServiceError> {
+        Ok(self
+            .store()?
+            .search(query)?
+            .iter()
+            .map(MediaItemPublic::from)
+            .collect())
+    }
+
+    pub fn set_favorite(&self, id: &str, favorite: bool) -> Result<(), ServiceError> {
+        let store = self.store()?;
+        let mut row = store.get(id).map_err(Self::map_store_err)?;
+        row.favorite = favorite;
+        store.update(&row)?;
+        Ok(())
+    }
+
+    pub fn set_title(&self, id: &str, title: &str) -> Result<(), ServiceError> {
+        let store = self.store()?;
+        let mut row = store.get(id).map_err(Self::map_store_err)?;
+        row.title = title.to_string();
+        store.update(&row)?;
+        Ok(())
+    }
+
+    pub fn set_album(&self, id: &str, album: &str) -> Result<(), ServiceError> {
+        let store = self.store()?;
+        let mut row = store.get(id).map_err(Self::map_store_err)?;
+        row.album = album.to_string();
+        store.update(&row)?;
+        Ok(())
+    }
+
+    pub fn activity(&self, limit: usize) -> Result<Vec<super::store::ActivityRow>, ServiceError> {
+        Ok(self.store()?.list_activity(limit)?)
+    }
+
     pub fn import(
         &self,
         path: &Path,
