@@ -8,6 +8,7 @@ mod entry_history;
 mod fido;
 pub mod folder_lock;
 pub mod file_lock;
+pub mod media_vault;
 mod hello;
 mod hibp;
 mod import_export;
@@ -46,8 +47,8 @@ pub fn run() {
             }
             #[cfg(windows)]
             {
-                let _ = folder_lock_crash_recover();
-                let _ = file_lock_crash_recover();
+                let _ = wipe_folder_lock_orphans_on_startup();
+                let _ = wipe_file_lock_orphans_on_startup();
                 let args: Vec<String> = std::env::args().collect();
                 if let Some(link) = folder_lock::deep_link::find_in_args(&args) {
                     stash_deep_link(link.clone());
