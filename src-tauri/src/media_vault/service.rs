@@ -4,7 +4,9 @@ use super::policy::{self, MediaKind, PolicyError};
 use super::store::{ItemStatus, MediaItemRow, MediaVaultStore, StoreError};
 use super::thumb;
 use crate::crypto;
-use crate::folder_lock::crypto_files::{encrypt_file_bytes, wrap_dek};
+use crate::folder_lock::crypto_files::{
+    decrypt_file_bytes, encrypt_file_bytes, unwrap_dek, wrap_dek,
+};
 use serde::{Deserialize, Serialize};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
@@ -40,6 +42,10 @@ pub enum ServiceError {
     NeedsLargeConfirm { size_bytes: u64 },
     #[error("File exceeds maximum import size of 2 GB")]
     ExceedsMaxSize { size_bytes: u64 },
+    #[error("Item not found")]
+    NotFound,
+    #[error("Item is not being viewed")]
+    NotViewing,
     #[error("{0}")]
     Other(String),
 }
@@ -102,6 +108,7 @@ pub struct MediaVaultService {
 impl MediaVaultService {
     pub fn new(data_dir: PathBuf) -> Result<Self, ServiceError> {
         fs::create_dir_all(data_dir.join("media-vault"))?;
+        fs::create_dir_all(data_dir.join("media-vault-staging"))?;
         MediaVaultStore::new(data_dir.clone())?;
         Ok(Self { data_dir })
     }
@@ -112,6 +119,172 @@ impl MediaVaultService {
 
     fn item_dir(&self, id: &str) -> PathBuf {
         self.data_dir.join("media-vault").join(id)
+    }
+
+    fn staging_dir(&self, id: &str) -> PathBuf {
+        self.data_dir.join("media-vault-staging").join(id)
+    }
+
+    fn map_store_err(e: StoreError) -> ServiceError {
+        match e {
+            StoreError::NotFound => ServiceError::NotFound,
+            other => ServiceError::Store(other),
+        }
+    }
+
+    fn decrypt_payload(
+        &self,
+        row: &MediaItemRow,
+        vault_key: &[u8; 32],
+    ) -> Result<Vec<u8>, ServiceError> {
+        let mut dek = unwrap_dek(&row.wrapped_dek, vault_key)?;
+        let blob = fs::read(self.item_dir(&row.id).join(PAYLOAD_BASENAME))?;
+        let plain = match decrypt_file_bytes(
+            &blob,
+            &dek,
+            "media",
+            &media_rel_aad(&row.id, &row.original_name),
+        ) {
+            Ok(p) => p,
+            Err(e) => {
+                dek.zeroize();
+                return Err(e.into());
+            }
+        };
+        dek.zeroize();
+        Ok(plain)
+    }
+
+    pub fn view(&self, id: &str, vault_key: &[u8; 32]) -> Result<PathBuf, ServiceError> {
+        let store = self.store()?;
+        let row = store.get(id).map_err(Self::map_store_err)?;
+
+        if row.status == ItemStatus::Viewing {
+            let out = self.staging_dir(id).join(&row.original_name);
+            if out.is_file() {
+                return Ok(out);
+            }
+        }
+
+        let plain = self.decrypt_payload(&row, vault_key)?;
+        let staging = self.staging_dir(id);
+        if staging.exists() {
+            wipe_dir_tree(&staging)?;
+        }
+        fs::create_dir_all(&staging)?;
+        let out = staging.join(&row.original_name);
+        fs::write(&out, plain)?;
+
+        store.update_status(id, ItemStatus::Viewing)?;
+        let _ = store.add_activity(id, "viewed", "Decrypted to staging for viewing");
+        Ok(out)
+    }
+
+    pub fn relock(&self, id: &str) -> Result<(), ServiceError> {
+        let store = self.store()?;
+        let row = store.get(id).map_err(Self::map_store_err)?;
+        if row.status != ItemStatus::Viewing {
+            return Err(ServiceError::NotViewing);
+        }
+        let staging = self.staging_dir(id);
+        if staging.exists() {
+            wipe_dir_tree(&staging)?;
+        }
+        store.update_status(id, ItemStatus::Stored)?;
+        let _ = store.add_activity(id, "relocked", "Staging wiped; item stored");
+        Ok(())
+    }
+
+    pub fn relock_all_viewing(&self) -> Result<(), ServiceError> {
+        let store = self.store()?;
+        for row in store.list()? {
+            if row.status == ItemStatus::Viewing {
+                self.relock(&row.id)?;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn delete_item(&self, id: &str, vault_key: &[u8; 32]) -> Result<(), ServiceError> {
+        let _ = vault_key;
+        let store = self.store()?;
+        store.get(id).map_err(Self::map_store_err)?;
+
+        let staging = self.staging_dir(id);
+        if staging.exists() {
+            wipe_dir_tree(&staging)?;
+        }
+        let item_dir = self.item_dir(id);
+        if item_dir.exists() {
+            wipe_dir_tree(&item_dir)?;
+        }
+        store.delete(id)?;
+        let _ = store.add_activity(id, "deleted", "Removed from Media Vault");
+        Ok(())
+    }
+
+    pub fn export(
+        &self,
+        id: &str,
+        dest: &Path,
+        vault_key: &[u8; 32],
+    ) -> Result<(), ServiceError> {
+        let store = self.store()?;
+        let row = store.get(id).map_err(Self::map_store_err)?;
+        let plain = self.decrypt_payload(&row, vault_key)?;
+
+        if let Some(parent) = dest.parent() {
+            fs::create_dir_all(parent)?;
+            let _ = prepare_writable(parent);
+        }
+        if dest.exists() {
+            prepare_writable(dest)?;
+            let _ = fs::remove_file(dest);
+        }
+        fs::write(dest, plain)?;
+        let _ = store.add_activity(id, "exported", "Exported to user path");
+        Ok(())
+    }
+
+    pub fn wipe_orphan_staging(&self) -> Result<(), ServiceError> {
+        let root = self.data_dir.join("media-vault-staging");
+        if root.exists() {
+            for entry in fs::read_dir(&root)? {
+                wipe_dir_tree(&entry?.path())?;
+            }
+        }
+        let store = self.store()?;
+        for row in store.list()? {
+            if row.status == ItemStatus::Viewing {
+                store.update_status(&row.id, ItemStatus::Stored)?;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn decrypt_thumb(&self, id: &str, vault_key: &[u8; 32]) -> Result<Vec<u8>, ServiceError> {
+        let store = self.store()?;
+        let row = store.get(id).map_err(Self::map_store_err)?;
+        let thumb_path = self.item_dir(id).join(THUMB_BASENAME);
+        if !thumb_path.is_file() {
+            return Err(ServiceError::NotFound);
+        }
+        let mut dek = unwrap_dek(&row.wrapped_dek, vault_key)?;
+        let blob = fs::read(thumb_path)?;
+        let jpeg = match decrypt_file_bytes(
+            &blob,
+            &dek,
+            "media",
+            &media_rel_aad(id, THUMB_BASENAME),
+        ) {
+            Ok(p) => p,
+            Err(e) => {
+                dek.zeroize();
+                return Err(e.into());
+            }
+        };
+        dek.zeroize();
+        Ok(jpeg)
     }
 
     pub fn import(
@@ -350,6 +523,48 @@ fn secure_wipe_file(path: &Path) -> Result<(), ServiceError> {
     Ok(())
 }
 
+fn wipe_dir_tree(path: &Path) -> Result<(), ServiceError> {
+    if !path.exists() {
+        return Ok(());
+    }
+    prepare_writable(path)?;
+    if path.is_file() {
+        secure_wipe_file(path)?;
+        fs::remove_file(path)?;
+        return Ok(());
+    }
+    for entry in fs::read_dir(path)? {
+        let entry = entry?;
+        let p = entry.path();
+        if p.is_dir() {
+            wipe_dir_tree(&p)?;
+        } else {
+            secure_wipe_file(&p)?;
+            fs::remove_file(&p)?;
+        }
+    }
+    prepare_writable(path)?;
+    fs::remove_dir(path)?;
+    Ok(())
+}
+
+/// Best-effort orphan wipe at process start (no unlock session exists yet).
+pub fn wipe_media_vault_orphans_on_startup() -> Result<(), String> {
+    #[cfg(not(windows))]
+    return Ok(());
+    #[cfg(windows)]
+    {
+        let Ok(dir) = crate::store::data_dir_public() else {
+            return Ok(());
+        };
+        let Ok(svc) = MediaVaultService::new(dir) else {
+            return Ok(());
+        };
+        let _ = svc.wipe_orphan_staging();
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -421,5 +636,100 @@ mod tests {
         .unwrap();
         dek.zeroize();
         assert_eq!(plain, TINY_JPEG);
+    }
+
+    #[test]
+    fn import_view_relock_delete_flow() {
+        let tmp = tempfile::tempdir().unwrap();
+        let data = tmp.path().join("data");
+        let src = tmp.path().join("photo.jpg");
+        fs::write(&src, TINY_JPEG).unwrap();
+
+        let svc = MediaVaultService::new(data.clone()).unwrap();
+        let vault_key = crypto::generate_key();
+        let item = svc
+            .import(&src, &vault_key, true, true)
+            .expect("import jpg");
+
+        let staging_path = svc.view(&item.id, &vault_key).unwrap();
+        assert_eq!(staging_path.file_name().unwrap(), "photo.jpg");
+        assert_eq!(fs::read(&staging_path).unwrap(), TINY_JPEG);
+        assert_eq!(
+            svc.store().unwrap().get(&item.id).unwrap().status,
+            ItemStatus::Viewing
+        );
+
+        svc.relock(&item.id).unwrap();
+        assert!(!data.join("media-vault-staging").join(&item.id).exists());
+        assert_eq!(
+            svc.store().unwrap().get(&item.id).unwrap().status,
+            ItemStatus::Stored
+        );
+
+        svc.delete_item(&item.id, &vault_key).unwrap();
+        assert!(!svc.item_dir(&item.id).exists());
+        assert!(matches!(
+            svc.store().unwrap().get(&item.id),
+            Err(StoreError::NotFound)
+        ));
+    }
+
+    #[test]
+    fn export_round_trip() {
+        let tmp = tempfile::tempdir().unwrap();
+        let data = tmp.path().join("data");
+        let src = tmp.path().join("photo.jpg");
+        fs::write(&src, TINY_JPEG).unwrap();
+
+        let svc = MediaVaultService::new(data).unwrap();
+        let vault_key = crypto::generate_key();
+        let item = svc.import(&src, &vault_key, false, true).unwrap();
+
+        let dest = tmp.path().join("exported.jpg");
+        svc.export(&item.id, &dest, &vault_key).unwrap();
+        assert_eq!(fs::read(&dest).unwrap(), TINY_JPEG);
+    }
+
+    #[test]
+    fn decrypt_thumb_round_trip() {
+        let tmp = tempfile::tempdir().unwrap();
+        let data = tmp.path().join("data");
+        let src = tmp.path().join("photo.jpg");
+        fs::write(&src, TINY_JPEG).unwrap();
+
+        let svc = MediaVaultService::new(data).unwrap();
+        let vault_key = crypto::generate_key();
+        let item = svc.import(&src, &vault_key, false, true).unwrap();
+
+        let jpeg = svc.decrypt_thumb(&item.id, &vault_key).unwrap();
+        assert!(!jpeg.is_empty());
+        assert_eq!(&jpeg[0..2], &[0xFF, 0xD8]);
+    }
+
+    #[test]
+    fn wipe_orphan_staging_resets_viewing() {
+        let tmp = tempfile::tempdir().unwrap();
+        let data = tmp.path().join("data");
+        let src = tmp.path().join("photo.jpg");
+        fs::write(&src, TINY_JPEG).unwrap();
+
+        let svc = MediaVaultService::new(data.clone()).unwrap();
+        let vault_key = crypto::generate_key();
+        let item = svc.import(&src, &vault_key, true, true).unwrap();
+        svc.view(&item.id, &vault_key).unwrap();
+        assert!(data.join("media-vault-staging").join(&item.id).exists());
+
+        svc.wipe_orphan_staging().unwrap();
+        assert!(!data.join("media-vault-staging").join(&item.id).exists());
+        assert_eq!(
+            svc.store().unwrap().get(&item.id).unwrap().status,
+            ItemStatus::Stored
+        );
+
+        let orphan = data.join("media-vault-staging").join("orphan-id");
+        fs::create_dir_all(&orphan).unwrap();
+        fs::write(orphan.join("leftover.bin"), b"secret").unwrap();
+        svc.wipe_orphan_staging().unwrap();
+        assert!(!orphan.exists());
     }
 }
