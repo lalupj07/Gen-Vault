@@ -7,6 +7,107 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.0] - 2026-08-20
+
+### Highlights
+
+Media Vault (Windows v1) — private encrypted gallery for photos, videos, and PDFs, third module in the lock suite.
+
+### Added
+
+#### Media Vault (Windows)
+- Import gallery via drag-drop and file picker (single and batch)
+- Ciphertext under `%LOCALAPPDATA%\GenVault\media-vault\<id>\` with optional delete-after-import
+- Encrypted thumbnails at rest (256px max edge); blurred grid when vault is locked
+- Private staging view — decrypt to `media-vault-staging`, open with OS default app, auto-lock wipes staging
+- Export to user-chosen path with master-password step-up
+- Album tags, favorites, search, and activity log
+- MIME allowlist (images, `.mp4`/`.webm`/`.mov`, PDF); large-file confirm (>256 MB), reject >2 GB
+- Sidebar **Media Vault** entry and `MediaVaultView` UI
+- Settings: auto-lock interval (`media_vault_settings.json`)
+
+### Security
+
+- Vault unlock gates all mutating IPC; export verifies master password before decrypt
+- Encrypted payload (`payload.gvm`) and thumbnail (`thumb.gvt`) blobs; no persistent plaintext under GenVault data dir except transient staging while viewing
+- Reject symlinks/junctions, system paths, and imports from GenVault data directories (mirrors Folder/File Lock policy)
+- Startup orphan staging wipe (`wipe_media_vault_orphans_on_startup`); crash-recover IPC requires unlock
+- Design spec: `docs/superpowers/specs/2026-08-20-media-vault-windows-design.md`
+
+### Notes
+
+- In-app video/PDF viewer deferred — view uses OS default app from staging
+- Explorer “Add to Media Vault” context menu deferred to follow-up
+
+---
+
+## [2.0.0] - 2026-08-07
+
+### Highlights
+
+Windows lock suite (Folder Lock + File Lock), Windows Hello enrollment fix, pre-production security hardening, and multi-package release (NSIS / MSI / MSIX / APPX).
+
+### Added
+
+#### Folder Lock (Windows)
+- Encrypt local NTFS folders under GenVault-controlled storage
+- Staging unlock, stub at original path, Explorer “Lock with GenVault”, `genvault://folder-lock`
+- Auto-lock and crash orphan staging wipe
+- Deep links and sidebar / in-app Folder Lock UI
+
+#### File Lock (Windows)
+- Same pattern for individual files (batch lock, 512 MB warn, separate staging)
+- Explorer file verb, `genvault://file-lock`, stub at original path
+
+#### Packaging
+- Release artifacts: NSIS `-setup.exe`, MSI, MSIX, APPX (`dist/release/v2.0.0/`)
+
+### Fixed
+
+- Windows Hello enroll stuck on “Enrolling…” — HWND interop + message pump (`RequestVerificationForWindowAsync`)
+- Folder Lock Access denied (OS error 5) — clear read-only on full trees before wipe
+- File Lock shell registration for `*` keys via .NET Registry API
+- Production install must use `tauri build` (plain `cargo build --release` pointed at localhost)
+
+### Security
+
+- Crash-recover IPC requires vault unlock; startup orphan wipe remains ungated
+- Vault erase: native OS confirm dialog + rate limit (lost-password path preserved)
+- Reject symlinks / junctions in Folder Lock and File Lock; path containment checks
+- Explorer verbs launch GenVault argv (`--lock-folder` / `--lock-file`) — no PowerShell
+- Masked master-password modal (replaces `window.prompt`)
+- Clear secure clipboard on Sign Out
+- Settings authenticator import uses otpauth phishing heuristics
+- `GENVAULT_DATA_DIR` ignored in release builds
+- System-path denylist uses `WINDIR` / Program Files env roots
+- Audit report: `docs/superpowers/specs/2026-08-07-v2-security-audit.md`
+
+### Notes
+
+- Packages are unsigned until a code-signing certificate is configured
+- PIN-only vault unlock remains disabled (master password is the secret factor)
+- OTP while unlocked is intentional authenticator UX (accepted residual)
+
+---
+
+## [1.5.0] - 2026-07-25
+
+### Added
+
+- Secure vault recovery / login-screen vault erase flow (`DELETE MY VAULT`)
+- Recovery codes and account recovery UX polish
+
+### Security
+
+- Remove Cognito leftovers; harden secret gitignore
+
+### Docs
+
+- Web demo (Vercel) design/plan for Android testers (separate branch)
+- Login-screen vault reset design
+
+---
+
 ## [1.0.0] - 2026-07-24
 
 ### Initial public release
@@ -44,4 +145,7 @@ No cloud account required. Vault data stays on-device.
 - Browser-only mode is disabled; use the GenVault app
 - Binaries are distributed via Microsoft Store (Windows) and GitHub Releases for testers; source is MIT
 
+[2.1.0]: https://github.com/lalupj07/Gen-Vault/releases/tag/v2.1.0
+[2.0.0]: https://github.com/lalupj07/Gen-Vault/releases/tag/v2.0.0
+[1.5.0]: https://github.com/lalupj07/Gen-Vault/releases/tag/v1.5.0
 [1.0.0]: https://github.com/lalupj07/Gen-Vault/releases/tag/v1.0.0
