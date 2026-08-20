@@ -449,6 +449,32 @@ export const api = {
   fileLockCrashRecover: () => invoke<void>('file_lock_crash_recover'),
   fileLockTakeDeepLink: () =>
     invoke<FileLockDeepLink | null>('file_lock_take_deep_link'),
+
+  mediaVaultList: () => invoke<MediaItem[]>('media_vault_list'),
+  mediaVaultSearch: (query: string) => invoke<MediaItem[]>('media_vault_search', { query }),
+  mediaVaultImport: (path: string, deleteOriginal = false, confirmLarge = false) =>
+    invoke<MediaItem>('media_vault_import', { path, deleteOriginal, confirmLarge }),
+  mediaVaultImportBatch: (paths: string[], deleteOriginal = false, confirmLarge = false) =>
+    invoke<MediaImportBatchResult>('media_vault_import_batch', { paths, deleteOriginal, confirmLarge }),
+  mediaVaultView: (id: string) => invoke<string>('media_vault_view', { id }),
+  mediaVaultRelock: (id: string) => invoke<void>('media_vault_relock', { id }),
+  mediaVaultRelockAll: () => invoke<void>('media_vault_relock_all'),
+  mediaVaultDelete: (id: string) => invoke<void>('media_vault_delete', { id }),
+  mediaVaultExport: (id: string, destPath: string, password: string) =>
+    invoke<void>('media_vault_export', { id, destPath, password }),
+  mediaVaultThumb: (id: string) => invoke<string>('media_vault_thumb', { id }),
+  mediaVaultSetFavorite: (id: string, favorite: boolean) =>
+    invoke<void>('media_vault_set_favorite', { id, favorite }),
+  mediaVaultSetTitle: (id: string, title: string) =>
+    invoke<void>('media_vault_set_title', { id, title }),
+  mediaVaultSetAlbum: (id: string, album: string) =>
+    invoke<void>('media_vault_set_album', { id, album }),
+  mediaVaultActivity: (limit = 50) =>
+    invoke<MediaVaultActivity[]>('media_vault_activity', { limit }),
+  mediaVaultSettingsGet: () => invoke<MediaVaultSettings>('media_vault_settings_get'),
+  mediaVaultSettingsSet: (autoLockMins: number) =>
+    invoke<MediaVaultSettings>('media_vault_settings_set', { autoLockMins }),
+  mediaVaultCrashRecover: () => invoke<void>('media_vault_crash_recover'),
 };
 
 export interface LockedFolder {
@@ -504,6 +530,35 @@ export interface FileLockDeepLink {
 
 export interface FileLockBatchResult {
   locked: LockedFile[];
+  failed: { path: string; error: string }[];
+}
+
+export interface MediaItem {
+  id: string;
+  title: string;
+  album: string;
+  mime: string;
+  status: string;
+  favorite: boolean;
+  size_bytes: number;
+  imported_at: number;
+  original_name: string;
+}
+
+export interface MediaVaultActivity {
+  id: string;
+  item_id: string;
+  action: string;
+  detail: string;
+  ts: number;
+}
+
+export interface MediaVaultSettings {
+  auto_lock_mins: number;
+}
+
+export interface MediaImportBatchResult {
+  imported: MediaItem[];
   failed: { path: string; error: string }[];
 }
 
