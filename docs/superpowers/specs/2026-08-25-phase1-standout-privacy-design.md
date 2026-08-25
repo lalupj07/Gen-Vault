@@ -1,7 +1,7 @@
 # GenVault Phase 1 — Standout Privacy (Windows) — Design
 
 **Date:** 2026-08-25  
-**Status:** Approved — implementation plan: `docs/superpowers/plans/2026-08-25-phase1-standout-privacy.md`  
+**Status:** Implemented (Windows v1) — implementation plan: `docs/superpowers/plans/2026-08-25-phase1-standout-privacy.md`  
 **Product:** GenVault (GenXis Innovations)  
 **Platform:** Windows desktop (Tauri 2) v1; Android follow-ups deferred  
 **Related:** Ships after Media Vault (v2.1.0). Complements lock suite; does not replace Folder/File/Media Lock.

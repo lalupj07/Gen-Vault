@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.2.0] - 2026-08-25
+
+### Highlights
+
+Phase 1: Standout Privacy (Windows v1) — panic lock, travel mode, guest unlock, and duress vault.
+
+### Added
+
+#### Standout Privacy (Windows)
+- **Panic lock** — one-click and `Ctrl+Shift+L` hotkey lock everything, wipe staging, clear clipboard
+- **Travel mode** — temporary lockdown (hide sensitive UI, block export/import/erase, shorter auto-lock); persists until disabled with master password
+- **Guest unlock** — time-boxed passphrase access to one Folder Lock, File Lock, or Media Vault item (default 15 min, max 60)
+- **Duress vault** — second password opens a decoy vault with no indicator that a real vault exists
+- Settings and sidebar UI for all four features
+- Design spec: `docs/superpowers/specs/2026-08-25-phase1-standout-privacy-design.md`
+
+### Security
+
+- Panic lock requires no password (availability under duress); relocks all lock modules and clears secure clipboard
+- Travel mode gates sensitive actions behind master-password step-up to disable
+- Guest unlock uses separate Argon2id-wrapped DEK per item (not master VMK)
+- Duress vault uses isolated `duress_key.enc` / `duress_vault.enc`; unlock timing matches real vault
+
+### Notes
+
+- Android Panic tile / Travel mode deferred
+- Remote wipe and multi-guest sessions out of scope for v1
+
+---
+
 ## [2.1.0] - 2026-08-20
 
 ### Highlights
@@ -145,6 +175,7 @@ No cloud account required. Vault data stays on-device.
 - Browser-only mode is disabled; use the GenVault app
 - Binaries are distributed via Microsoft Store (Windows) and GitHub Releases for testers; source is MIT
 
+[2.2.0]: https://github.com/lalupj07/Gen-Vault/releases/tag/v2.2.0
 [2.1.0]: https://github.com/lalupj07/Gen-Vault/releases/tag/v2.1.0
 [2.0.0]: https://github.com/lalupj07/Gen-Vault/releases/tag/v2.0.0
 [1.5.0]: https://github.com/lalupj07/Gen-Vault/releases/tag/v1.5.0
