@@ -401,6 +401,7 @@ pub fn delete_account() -> Result<(), StoreError> {
     let _ = crate::recovery_codes::delete_all_recovery_codes();
     let dir = data_dir()?;
     let _ = delete_duress_files();
+    let _ = crate::guest::wipe_all_guest_data();
     clear_vault_data_dir(&dir)?;
     // Success = no account metadata left (root dir may remain on Android).
     if account_exists().unwrap_or(false) {

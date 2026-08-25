@@ -1251,6 +1251,15 @@ export function SettingsView({ onReplayWelcomeTour }: { onReplayWelcomeTour?: ()
   const [guestTtlMins, setGuestTtlMins] = useState(15);
   const [guestItems, setGuestItems] = useState<{ id: string; label: string }[]>([]);
 
+  // Duress password
+  const [duressEnrolled, setDuressEnrolled] = useState(false);
+  const [duressLoading, setDuressLoading] = useState(false);
+  const [duressError, setDuressError] = useState('');
+  const [duressMessage, setDuressMessage] = useState('');
+  const [showDuressEnroll, setShowDuressEnroll] = useState(false);
+  const [duressPassword, setDuressPassword] = useState('');
+  const [duressConfirm, setDuressConfirm] = useState('');
+
   // Unlock method enrollment state
   const [showPasswordEnroll, setShowPasswordEnroll] = useState(false);
   const [newPassword, setNewPassword] = useState('');
@@ -1276,6 +1285,14 @@ export function SettingsView({ onReplayWelcomeTour }: { onReplayWelcomeTour?: ()
   const [importError, setImportError] = useState('');
   const [importLoading, setImportLoading] = useState(false);
 
+  const refreshDuressStatus = useCallback(async () => {
+    try {
+      setDuressEnrolled(await api.hasDuressEnrolled());
+    } catch {
+      setDuressEnrolled(false);
+    }
+  }, []);
+
   // Load settings from backend
   useEffect(() => {
     (async () => {
@@ -1291,9 +1308,10 @@ export function SettingsView({ onReplayWelcomeTour }: { onReplayWelcomeTour?: ()
         setLockTimeoutMins(mins);
         setClockDrift(await api.getClockDrift());
         setTimezoneOffset(await api.getTimezoneOffset());
+        await refreshDuressStatus();
       } catch {}
     })();
-  }, []);
+  }, [refreshDuressStatus]);
 
   const refreshGuestGrants = useCallback(async () => {
     if (vaultLocked) return;
@@ -1447,6 +1465,56 @@ export function SettingsView({ onReplayWelcomeTour }: { onReplayWelcomeTour?: ()
 
   const exportBlocked = travelMode;
   const effectiveLockMins = travelMode ? Math.min(lockTimeoutMins, 2) : lockTimeoutMins;
+
+  const handleDuressEnroll = async () => {
+    if (duressPassword.length < 12) {
+      setDuressError('Duress password must be at least 12 characters');
+      return;
+    }
+    if (duressPassword !== duressConfirm) {
+      setDuressError('Passwords do not match');
+      return;
+    }
+    setDuressError('');
+    setDuressMessage('');
+    const masterPassword = await promptMasterPassword('Enter master password to enroll duress password:');
+    if (!masterPassword) return;
+    if (masterPassword === duressPassword) {
+      setDuressError('Duress password must differ from master password');
+      return;
+    }
+    setDuressLoading(true);
+    try {
+      await api.enrollDuressPassword(masterPassword, duressPassword);
+      setDuressMessage('Duress password enrolled');
+      setShowDuressEnroll(false);
+      setDuressPassword('');
+      setDuressConfirm('');
+      await refreshDuressStatus();
+    } catch (e) {
+      setDuressError(e instanceof Error ? e.message : 'Failed to enroll duress password');
+    }
+    setDuressLoading(false);
+  };
+
+  const handleDuressRemove = async () => {
+    setDuressError('');
+    setDuressMessage('');
+    const masterPassword = await promptMasterPassword('Enter master password to remove duress password:');
+    if (!masterPassword) return;
+    setDuressLoading(true);
+    try {
+      await api.removeDuressPassword(masterPassword);
+      setDuressMessage('Duress password removed');
+      setShowDuressEnroll(false);
+      setDuressPassword('');
+      setDuressConfirm('');
+      await refreshDuressStatus();
+    } catch (e) {
+      setDuressError(e instanceof Error ? e.message : 'Failed to remove duress password');
+    }
+    setDuressLoading(false);
+  };
 
   // Unlock method enrollment handlers
   const handleSetPassword = async () => {
@@ -1692,6 +1760,89 @@ export function SettingsView({ onReplayWelcomeTour }: { onReplayWelcomeTour?: ()
             </div>
           )}
         </div>
+      </GlassCard>
+
+      <GlassCard>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-medium text-vault-light">Duress Password</h3>
+          {!vaultLocked && !duressEnrolled && (
+            <button
+              type="button"
+              onClick={() => { setShowDuressEnroll((v) => !v); setDuressError(''); setDuressMessage(''); }}
+              disabled={duressLoading}
+              className="text-[10px] px-3 py-1.5 rounded-lg bg-cyber-cyan/10 text-cyber-cyan border border-cyber-cyan/20 hover:bg-cyber-cyan/20 transition-colors disabled:opacity-50"
+            >
+              {showDuressEnroll ? 'Cancel' : 'Set up'}
+            </button>
+          )}
+        </div>
+        <p className="text-[11px] text-vault-muted mb-4">
+          A separate password that unlocks a harmless decoy vault. The app looks identical — use when compelled to reveal your password.
+        </p>
+        {vaultLocked ? (
+          <div className="text-center py-4 text-vault-muted text-sm">
+            Unlock vault to manage duress password.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <div className="text-sm text-vault-light">Status</div>
+                <div className="text-[11px] text-vault-muted">
+                  {duressEnrolled ? 'Enrolled — decoy vault active' : 'Not enrolled'}
+                </div>
+              </div>
+              {duressEnrolled && (
+                <button
+                  type="button"
+                  onClick={() => { void handleDuressRemove(); }}
+                  disabled={duressLoading}
+                  className="text-[10px] px-3 py-1.5 rounded-lg bg-accent-danger/10 text-accent-danger border border-accent-danger/20 hover:bg-accent-danger/20 transition-colors disabled:opacity-50"
+                >
+                  {duressLoading ? 'Removing…' : 'Remove'}
+                </button>
+              )}
+            </div>
+            {showDuressEnroll && !duressEnrolled && (
+              <div className="p-4 rounded-xl bg-vault-black/30 border border-vault-border/30 space-y-3">
+                <input
+                  type="password"
+                  autoComplete="off"
+                  placeholder="New duress password (12+ characters)"
+                  value={duressPassword}
+                  onChange={(e) => setDuressPassword(e.target.value)}
+                  className="m3-field w-full text-sm"
+                />
+                <input
+                  type="password"
+                  autoComplete="off"
+                  placeholder="Confirm duress password"
+                  value={duressConfirm}
+                  onChange={(e) => setDuressConfirm(e.target.value)}
+                  className="m3-field w-full text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => { void handleDuressEnroll(); }}
+                  disabled={duressLoading}
+                  className="w-full min-h-[44px] rounded-lg bg-cyber-cyan/20 text-sm font-semibold text-cyber-cyan disabled:opacity-50"
+                >
+                  {duressLoading ? 'Enrolling…' : 'Enroll duress password'}
+                </button>
+              </div>
+            )}
+            {duressError && (
+              <div className="p-3 rounded-lg bg-accent-danger/10 border border-accent-danger/20 text-accent-danger text-xs">
+                {duressError}
+              </div>
+            )}
+            {duressMessage && (
+              <div className="p-3 rounded-lg bg-cyber-cyan/10 border border-cyber-cyan/20 text-cyber-cyan text-xs">
+                {duressMessage}
+              </div>
+            )}
+          </div>
+        )}
       </GlassCard>
 
       <GlassCard>

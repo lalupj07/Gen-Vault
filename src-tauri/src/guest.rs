@@ -444,6 +444,22 @@ pub fn guest_unlock(grant_id: &str, passphrase: &str) -> Result<GuestUnlockResul
     })
 }
 
+/// Wipe all guest grant artifacts (used during full vault erase).
+pub fn wipe_all_guest_data() -> Result<(), GuestError> {
+    let path = grants_path()?;
+    if path.exists() {
+        let _ = fs::remove_file(&path);
+    }
+    if let Ok(dir) = guest_grants_dir() {
+        let _ = wipe_dir_tree(&dir);
+    }
+    let staging_root = store::data_dir_public()?.join("guest-staging");
+    if staging_root.exists() {
+        let _ = wipe_dir_tree(&staging_root);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
