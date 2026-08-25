@@ -3,6 +3,7 @@ use uuid::Uuid;
 use zeroize::Zeroize;
 
 use super::{entry_public, get_key, now_ts, session, validate_master_password, with_vault};
+use crate::commands::privacy::ensure_export_allowed;
 use crate::hello;
 use crate::models::*;
 use crate::rate_limit;
@@ -102,6 +103,11 @@ static RESET_IN_PROGRESS: AtomicBool = AtomicBool::new(false);
 pub fn erase_vault_and_reset(confirmation: String) -> Result<(), String> {
     if confirmation != VAULT_ERASE_CONFIRMATION {
         return Err("Vault erase confirmation did not match.".to_string());
+    }
+
+    // When vault is unlocked with travel mode on, block destructive erase.
+    if get_key().is_ok() {
+        ensure_export_allowed()?;
     }
 
     rate_limit::check_allowed("vault_erase")?;
@@ -1018,6 +1024,7 @@ pub fn get_usage_statistics() -> Result<crate::models::UsageStatistics, String> 
 /// Produce an encrypted, portable backup of the vault protected by a passphrase.
 #[tauri::command]
 pub fn export_backup(passphrase: String) -> Result<String, String> {
+    ensure_export_allowed()?;
     validate_master_password(&passphrase)?;
     let key = get_key()?;
     store::export_backup(&passphrase, &key).map_err(|e| e.to_string())

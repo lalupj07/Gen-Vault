@@ -1,13 +1,20 @@
-//! Privacy commands — panic lock and related (Phase 1).
+//! Privacy commands — panic lock, travel mode (Phase 1).
 
 use crate::commands::{
     file_lock::wipe_file_lock_orphans_on_startup,
     folder_lock::wipe_folder_lock_orphans_on_startup,
-    lock_vault,
-    media_vault::wipe_media_vault_orphans_on_startup,
+    get_key, lock_vault, media_vault::wipe_media_vault_orphans_on_startup, with_vault,
 };
 use crate::media_vault::service::MediaVaultService;
 use crate::store;
+use zeroize::Zeroize;
+
+#[cfg(windows)]
+use windows::Win32::Foundation::HWND;
+#[cfg(windows)]
+use windows::Win32::UI::WindowsAndMessaging::{
+    SetWindowDisplayAffinity, WDA_EXCLUDEFROMCAPTURE, WDA_NONE,
+};
 
 #[cfg(windows)]
 fn wipe_all_staging_best_effort() {
@@ -31,6 +38,105 @@ pub(crate) fn execute_panic_lock() -> Result<(), String> {
 #[tauri::command]
 pub fn panic_lock() -> Result<(), String> {
     execute_panic_lock()
+}
+
+fn verify_master_password(password: &str) -> Result<(), String> {
+    let key = get_key()?;
+    let mut unlocked = store::unlock_with_secret("password", password).map_err(|e| e.to_string())?;
+    let ok = unlocked == key;
+    unlocked.zeroize();
+    if !ok {
+        return Err("Incorrect master password".to_string());
+    }
+    Ok(())
+}
+
+fn window_hwnd(window: &tauri::WebviewWindow) -> Result<isize, String> {
+    #[cfg(windows)]
+    {
+        let hwnd = window.hwnd().map_err(|e| e.to_string())?;
+        Ok(hwnd.0 as isize)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = window;
+        Ok(0)
+    }
+}
+
+/// Best-effort Windows capture shield for travel mode.
+fn set_capture_shield(hwnd: isize, enabled: bool) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        if hwnd == 0 {
+            return Ok(());
+        }
+        unsafe {
+            let affinity = if enabled {
+                WDA_EXCLUDEFROMCAPTURE
+            } else {
+                WDA_NONE
+            };
+            SetWindowDisplayAffinity(HWND(hwnd as *mut _), affinity)
+                .map_err(|e| format!("Capture shield failed: {e}"))?;
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (hwnd, enabled);
+    }
+    Ok(())
+}
+
+pub(crate) fn travel_mode_enabled() -> Result<bool, String> {
+    let _key = get_key()?;
+    with_vault(|vault| Ok(vault.settings.travel_mode))
+}
+
+/// Block export / backup / erase while travel mode is active (vault must be unlocked).
+pub(crate) fn ensure_export_allowed() -> Result<(), String> {
+    if travel_mode_enabled()? {
+        return Err("Not available while travel mode is enabled".into());
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_travel_mode(window: tauri::WebviewWindow) -> Result<bool, String> {
+    let enabled = travel_mode_enabled()?;
+    if enabled {
+        let _ = set_capture_shield(window_hwnd(&window)?, true);
+    }
+    Ok(enabled)
+}
+
+#[tauri::command]
+pub fn set_travel_mode(
+    enabled: bool,
+    password: Option<String>,
+    window: tauri::WebviewWindow,
+) -> Result<(), String> {
+    let _key = get_key()?;
+    let hwnd = window_hwnd(&window)?;
+
+    if enabled {
+        with_vault(|vault| {
+            vault.settings.travel_mode = true;
+            Ok(())
+        })?;
+        set_capture_shield(hwnd, true)?;
+    } else {
+        let pw = password
+            .filter(|p| !p.is_empty())
+            .ok_or_else(|| "Master password required to disable travel mode".to_string())?;
+        verify_master_password(&pw)?;
+        with_vault(|vault| {
+            vault.settings.travel_mode = false;
+            Ok(())
+        })?;
+        set_capture_shield(hwnd, false)?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]

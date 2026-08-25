@@ -63,6 +63,7 @@ function GlassCard({ children, className }: { children: React.ReactNode; classNa
 
 // ===== Vault View =====
 export function VaultView() {
+  const { travelMode } = useAuth();
   const [entries, setEntries] = useState<VaultEntry[]>([]);
   const [showAdd, setShowAdd] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
@@ -93,6 +94,10 @@ export function VaultView() {
   }, [searchQuery]);
 
   useEffect(() => { loadEntries(); }, [loadEntries]);
+
+  const visibleEntries = travelMode
+    ? entries.filter((e) => !(e.tags ?? []).includes('travel-hide'))
+    : entries;
 
   useEffect(() => {
     return onShortcut((action) => {
@@ -266,8 +271,8 @@ export function VaultView() {
             <Database className="w-5 h-5 text-cyber-purple" />
             <span className="text-sm font-medium text-vault-light">Vault Entries</span>
           </div>
-          <div className="text-2xl font-bold text-vault-light mb-1">{entries.length}</div>
-          <p className="text-[11px] text-vault-muted">Across {new Set(entries.map(e => e.category)).size} categories</p>
+          <div className="text-2xl font-bold text-vault-light mb-1">{visibleEntries.length}</div>
+          <p className="text-[11px] text-vault-muted">Across {new Set(visibleEntries.map(e => e.category)).size} categories</p>
         </GlassCard>
         <GlassCard>
           <div className="flex items-center gap-3 mb-3">
@@ -394,11 +399,11 @@ export function VaultView() {
             <button onClick={handleBulkDelete} className="text-xs px-2 py-1 rounded bg-accent-danger/10 text-accent-danger">Delete</button>
           </div>
         )}
-        {entries.length === 0 ? (
+        {visibleEntries.length === 0 ? (
           <div className="text-center py-8 text-vault-muted text-sm">No vault entries yet. Click &quot;Add Entry&quot; to get started.</div>
         ) : (
           <div className="space-y-2">
-            {entries.map((entry) => (
+            {visibleEntries.map((entry) => (
               <motion.div key={entry.id} variants={item}
                 className="flex items-center gap-3 p-3 rounded-xl glass-light group hover:bg-white/[0.03] transition-colors"
               >
@@ -1229,7 +1234,9 @@ export function SettingsView({ onReplayWelcomeTour }: { onReplayWelcomeTour?: ()
   const [clockDrift, setClockDrift] = useState(0);
   const [timezoneOffset, setTimezoneOffset] = useState(0);
   const { theme } = useTheme();
-  const { unlockMethods, vaultLocked, refreshUnlockMethods } = useAuth();
+  const { unlockMethods, vaultLocked, refreshUnlockMethods, travelMode, refreshTravelMode } = useAuth();
+  const [travelLoading, setTravelLoading] = useState(false);
+  const [travelError, setTravelError] = useState('');
 
   // Unlock method enrollment state
   const [showPasswordEnroll, setShowPasswordEnroll] = useState(false);
@@ -1295,9 +1302,37 @@ export function SettingsView({ onReplayWelcomeTour }: { onReplayWelcomeTour?: ()
     } catch {}
   };
   const handleTimeoutChange = (mins: number) => {
-    setLockTimeoutMins(mins);
-    saveSettings(autoLock, biometric, cloudSync, mins);
+    const capped = travelMode ? Math.min(mins, 2) : mins;
+    setLockTimeoutMins(capped);
+    saveSettings(autoLock, biometric, cloudSync, capped);
   };
+
+  const handleTravelMode = async (enabled: boolean) => {
+    setTravelError('');
+    setTravelLoading(true);
+    try {
+      if (enabled) {
+        await api.setTravelMode(true);
+        if (autoLock && lockTimeoutMins > 2) {
+          handleTimeoutChange(2);
+        }
+      } else {
+        const password = await promptMasterPassword('Enter master password to disable travel mode:');
+        if (!password) {
+          setTravelLoading(false);
+          return;
+        }
+        await api.setTravelMode(false, password);
+      }
+      await refreshTravelMode();
+    } catch (e) {
+      setTravelError(e instanceof Error ? e.message : 'Travel mode update failed');
+    }
+    setTravelLoading(false);
+  };
+
+  const exportBlocked = travelMode;
+  const effectiveLockMins = travelMode ? Math.min(lockTimeoutMins, 2) : lockTimeoutMins;
 
   // Unlock method enrollment handlers
   const handleSetPassword = async () => {
@@ -1502,9 +1537,21 @@ export function SettingsView({ onReplayWelcomeTour }: { onReplayWelcomeTour?: ()
 
       <GlassCard>
         <h3 className="text-sm font-medium text-vault-light mb-4">Security</h3>
+        {travelMode && (
+          <div className="mb-4 p-3 rounded-lg bg-cyber-cyan/10 border border-cyber-cyan/20 text-[11px] text-cyber-cyan">
+            Travel mode is active — sensitive entries, exports, and USB backup are restricted. Auto-lock is capped at 2 minutes.
+          </div>
+        )}
         <div className="space-y-4">
           {[
-            { label: 'Auto-Lock Vault', desc: `Lock vault after ${lockTimeoutMins} minutes of inactivity`, value: autoLock, onChange: handleAutoLock },
+            {
+              label: 'Travel Mode',
+              desc: 'Temporary lockdown for airports and shared spaces. Disable requires master password.',
+              value: travelMode,
+              onChange: (v: boolean) => { void handleTravelMode(v); },
+              disabled: travelLoading || vaultLocked,
+            },
+            { label: 'Auto-Lock Vault', desc: `Lock vault after ${effectiveLockMins} minute${effectiveLockMins === 1 ? '' : 's'} of inactivity${travelMode ? ' (travel cap: 2 min)' : ''}`, value: autoLock, onChange: handleAutoLock },
             { label: 'Biometric Unlock', desc: 'Use Windows Hello for vault access', value: biometric, onChange: handleBiometric },
             { label: 'HIBP Breach Checks', desc: 'Check vault secrets against Have I Been Pwned (k-anonymity)', value: hibpAudit, onChange: handleHibpAudit },
             { label: 'Encrypted Cloud Sync', desc: 'Coming soon — not yet available', value: false, onChange: () => {} },
@@ -1517,12 +1564,17 @@ export function SettingsView({ onReplayWelcomeTour }: { onReplayWelcomeTour?: ()
               <Toggle value={setting.value} onChange={setting.onChange} />
             </div>
           ))}
+          {travelError && (
+            <div className="p-3 rounded-lg bg-accent-danger/10 border border-accent-danger/20 text-accent-danger text-xs">
+              {travelError}
+            </div>
+          )}
           {autoLock && (
             <div className="flex items-center gap-3 py-2">
               <span className="text-xs text-vault-muted">Lock timeout (minutes)</span>
-              <input type="range" min={1} max={60} value={lockTimeoutMins}
+              <input type="range" min={1} max={travelMode ? 2 : 60} value={effectiveLockMins}
                 onChange={e => handleTimeoutChange(Number(e.target.value))} className="flex-1" />
-              <span className="text-xs text-vault-light w-8">{lockTimeoutMins}</span>
+              <span className="text-xs text-vault-light w-8">{effectiveLockMins}</span>
             </div>
           )}
         </div>
@@ -1675,10 +1727,10 @@ export function SettingsView({ onReplayWelcomeTour }: { onReplayWelcomeTour?: ()
             />
             <button
               onClick={handleExportBackup}
-              disabled={backupLoading}
+              disabled={backupLoading || exportBlocked}
               className="w-full py-2 rounded-lg bg-cyber-emerald/10 text-cyber-emerald border border-cyber-emerald/20 text-xs font-medium hover:bg-cyber-emerald/20 transition-colors disabled:opacity-50"
             >
-              {backupLoading ? 'Exporting...' : 'Download Encrypted Backup'}
+              {backupLoading ? 'Exporting...' : exportBlocked ? 'Export blocked (travel mode)' : 'Download Encrypted Backup'}
             </button>
           </div>
 
@@ -1701,10 +1753,10 @@ export function SettingsView({ onReplayWelcomeTour }: { onReplayWelcomeTour?: ()
             )}
             <button
               onClick={handleExportUsb}
-              disabled={usbLoading || usbDrives.length === 0}
+              disabled={usbLoading || usbDrives.length === 0 || exportBlocked}
               className="w-full py-2 rounded-lg bg-cyber-cyan/10 text-cyber-cyan border border-cyber-cyan/20 text-xs font-medium hover:bg-cyber-cyan/20 transition-colors disabled:opacity-50"
             >
-              {usbLoading ? 'Writing to USB...' : 'Save Backup to USB'}
+              {usbLoading ? 'Writing to USB...' : exportBlocked ? 'USB backup blocked (travel mode)' : 'Save Backup to USB'}
             </button>
             {usbMessage && <p className="text-[11px] text-cyber-emerald mt-2">{usbMessage}</p>}
           </div>
@@ -1752,10 +1804,12 @@ export function SettingsView({ onReplayWelcomeTour }: { onReplayWelcomeTour?: ()
               {showImport ? 'Hide Import' : 'Import Accounts'}
             </button>
             <button onClick={handleExportAuthenticator}
-              className="px-3 py-1.5 rounded-lg bg-cyber-purple/10 text-cyber-purple text-xs border border-cyber-purple/20">
-              Export Secrets (JSON)
+              disabled={exportBlocked}
+              className="px-3 py-1.5 rounded-lg bg-cyber-purple/10 text-cyber-purple text-xs border border-cyber-purple/20 disabled:opacity-50">
+              {exportBlocked ? 'Export blocked (travel mode)' : 'Export Secrets (JSON)'}
             </button>
             <button onClick={async () => {
+              if (exportBlocked) return;
               try {
                 const json = await api.exportVaultJson();
                 const blob = new Blob([json], { type: 'application/json' });
@@ -1764,10 +1818,11 @@ export function SettingsView({ onReplayWelcomeTour }: { onReplayWelcomeTour?: ()
                 a.href = url; a.download = `genvault-metadata-${Date.now()}.json`; a.click();
                 URL.revokeObjectURL(url);
               } catch (e) { setImportError(e instanceof Error ? e.message : 'Export failed'); }
-            }} className="px-3 py-1.5 rounded-lg bg-white/[0.03] text-vault-muted text-xs border border-vault-border/30">
-              Export Metadata (JSON)
+            }} disabled={exportBlocked} className="px-3 py-1.5 rounded-lg bg-white/[0.03] text-vault-muted text-xs border border-vault-border/30 disabled:opacity-50">
+              {exportBlocked ? 'Metadata export blocked' : 'Export Metadata (JSON)'}
             </button>
             <button onClick={async () => {
+              if (exportBlocked) return;
               try {
                 const csv = await api.exportVaultCsv();
                 const blob = new Blob([csv], { type: 'text/csv' });
@@ -1776,8 +1831,8 @@ export function SettingsView({ onReplayWelcomeTour }: { onReplayWelcomeTour?: ()
                 a.href = url; a.download = `genvault-${Date.now()}.csv`; a.click();
                 URL.revokeObjectURL(url);
               } catch (e) { setImportError(e instanceof Error ? e.message : 'Export failed'); }
-            }} className="px-3 py-1.5 rounded-lg bg-white/[0.03] text-vault-muted text-xs border border-vault-border/30">
-              Export CSV
+            }} disabled={exportBlocked} className="px-3 py-1.5 rounded-lg bg-white/[0.03] text-vault-muted text-xs border border-vault-border/30 disabled:opacity-50">
+              {exportBlocked ? 'CSV export blocked' : 'Export CSV'}
             </button>
           </div>
           {showImport && (

@@ -33,7 +33,7 @@ import MobileShell from '@/components/mobile/MobileShell';
 
 export default function Home() {
   const router = useRouter();
-  const { user, isAuthenticated, vaultLocked, isLoading: authLoading, logOut, completeOnboarding, lockVault, panicLock } = useAuth();
+  const { user, isAuthenticated, vaultLocked, isLoading: authLoading, logOut, completeOnboarding, lockVault, panicLock, travelMode } = useAuth();
   const [isBootLoading, setIsBootLoading] = useState(true);
   const [activeView, setActiveView] = useState('dashboard');
   const [collapsed, setCollapsed] = useState(false);
@@ -42,6 +42,9 @@ export default function Home() {
   const [welcomeTourOpen, setWelcomeTourOpen] = useState(false);
   const [appState, setAppState] = useState<AppState>(defaultAppState);
   const [vaultEntries, setVaultEntries] = useState<ApiVaultEntry[]>([]);
+  const visibleVaultEntries = travelMode
+    ? vaultEntries.filter((e) => !(e.tags ?? []).includes('travel-hide'))
+    : vaultEntries;
   const [androidShell, setAndroidShell] = useState(false);
   const [folderLockPrefill, setFolderLockPrefill] = useState<{
     action: string;
@@ -257,9 +260,9 @@ export default function Home() {
   const renderView = () => {
     switch (activeView) {
       case 'dashboard':
-        return <Dashboard appState={appState} vaultEntries={vaultEntries as any} />;
+        return <Dashboard appState={appState} vaultEntries={visibleVaultEntries as any} />;
       case 'authenticator':
-        return <Authenticator entries={vaultEntries as any} />;
+        return <Authenticator entries={visibleVaultEntries as any} />;
       case 'vault':
         return <VaultView />;
       case 'folder-lock':
@@ -297,7 +300,7 @@ export default function Home() {
       case 'profile':
         return <ProfileView />;
       default:
-        return <Dashboard appState={appState} vaultEntries={vaultEntries as any} />;
+        return <Dashboard appState={appState} vaultEntries={visibleVaultEntries as any} />;
     }
   };
 

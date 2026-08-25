@@ -13,6 +13,7 @@ use super::{
     entry_public, get_key, hash_emergency_code, now_ts, session, verify_emergency_code_hash,
     with_vault,
 };
+use crate::commands::privacy::ensure_export_allowed;
 // ===== Vault Entry Commands =====
 
 #[tauri::command]
@@ -552,6 +553,7 @@ pub fn get_security_score() -> Result<u32, String> {
 
 #[tauri::command]
 pub fn export_vault() -> Result<String, String> {
+    ensure_export_allowed()?;
     let key = get_key()?;
     let vault = store::load_vault_with_key(&key).map_err(|e| e.to_string())?;
 
@@ -968,6 +970,7 @@ pub fn get_auto_lock_settings() -> Result<(bool, u32), String> {
 
 #[tauri::command]
 pub fn export_vault_json() -> Result<String, String> {
+    ensure_export_allowed()?;
     let key = get_key()?;
     let vault = store::load_vault_with_key(&key).map_err(|e| e.to_string())?;
     let public: Vec<VaultEntryPublic> = vault.vault_entries.iter().map(entry_public).collect();
@@ -976,6 +979,7 @@ pub fn export_vault_json() -> Result<String, String> {
 
 #[tauri::command]
 pub fn export_vault_secrets_json(password: String) -> Result<String, String> {
+    ensure_export_allowed()?;
     let key = get_key()?;
     let mut unlocked = store::unlock_with_secret("password", &password).map_err(|e| e.to_string())?;
     let ok = unlocked == key;
@@ -989,6 +993,7 @@ pub fn export_vault_secrets_json(password: String) -> Result<String, String> {
 
 #[tauri::command]
 pub fn export_vault_csv() -> Result<String, String> {
+    ensure_export_allowed()?;
     // Notes omitted — may contain secrets; use password-gated secret export for sensitive data.
     let csv = with_vault(|vault| {
         let mut csv = String::from(
@@ -1415,6 +1420,7 @@ pub fn list_removable_drives() -> Vec<crate::usb_drives::RemovableDrive> {
 
 #[tauri::command]
 pub fn export_backup_to_usb(passphrase: String, drive_letter: String) -> Result<String, String> {
+    ensure_export_allowed()?;
     super::validate_master_password(&passphrase)?;
     let key = get_key()?;
     crate::usb_drives::export_backup_to_drive(&passphrase, &drive_letter, &key)

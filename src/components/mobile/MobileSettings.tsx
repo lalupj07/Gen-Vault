@@ -22,7 +22,7 @@ export default function MobileSettings({ onRefresh, onOpenAbout }: Props) {
   const { theme, setTheme } = useTheme();
   const { t, locale, setLocale, locales } = useI18n();
   const { font, setFont, fonts } = useFont();
-  const { refreshUnlockMethods, user, resetToSetup } = useAuth();
+  const { refreshUnlockMethods, user, resetToSetup, travelMode } = useAuth();
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [helloOk, setHelloOk] = useState(false);
   const [hasHello, setHasHello] = useState(false);
@@ -313,11 +313,11 @@ export default function MobileSettings({ onRefresh, onOpenAbout }: Props) {
         <div className="flex gap-2">
           <button
             type="button"
-            disabled={busy}
+            disabled={busy || travelMode}
             onClick={exportBackup}
-            className="flex-1 min-h-[44px] rounded-[var(--m3-radius-lg)] bg-[color:var(--md-primary-container)] text-[color:var(--md-on-primary-container)] font-medium flex items-center justify-center gap-2 hover:brightness-110 transition-[filter] duration-200"
+            className="flex-1 min-h-[44px] rounded-[var(--m3-radius-lg)] bg-[color:var(--md-primary-container)] text-[color:var(--md-on-primary-container)] font-medium flex items-center justify-center gap-2 hover:brightness-110 transition-[filter] duration-200 disabled:opacity-50"
           >
-            <Download className="w-4 h-4" /> {t('common.export')}
+            <Download className="w-4 h-4" /> {travelMode ? 'Export blocked' : t('common.export')}
           </button>
           <button
             type="button"
@@ -342,11 +342,12 @@ export default function MobileSettings({ onRefresh, onOpenAbout }: Props) {
         </p>
         <button
           type="button"
+          disabled={travelMode}
           onClick={() => setShowRecovery(true)}
-          className="w-full min-h-[48px] rounded-[var(--m3-radius-lg)] border border-accent-danger/40 px-4 text-sm font-medium text-accent-danger hover:bg-accent-danger/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-danger flex items-center justify-center gap-2"
+          className="w-full min-h-[48px] rounded-[var(--m3-radius-lg)] border border-accent-danger/40 px-4 text-sm font-medium text-accent-danger hover:bg-accent-danger/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-danger flex items-center justify-center gap-2 disabled:opacity-50"
         >
           <Trash2 className="w-4 h-4" aria-hidden />
-          Erase vault and start fresh
+          {travelMode ? 'Erase blocked (travel mode)' : 'Erase vault and start fresh'}
         </button>
       </section>
 

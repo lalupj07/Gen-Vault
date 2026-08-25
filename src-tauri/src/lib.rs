@@ -93,6 +93,8 @@ pub fn run() {
             log_out,
             lock_vault,
             panic_lock,
+            get_travel_mode,
+            set_travel_mode,
             setup_master_password_from_legacy,
             complete_onboarding,
             update_user,

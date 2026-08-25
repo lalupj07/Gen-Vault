@@ -28,6 +28,7 @@ interface AuthState {
   authFlow: AuthFlow;
   vaultLocked: boolean;
   unlockMethods: string[];
+  travelMode: boolean;
 }
 
 interface AuthContextType extends AuthState {
@@ -43,6 +44,7 @@ interface AuthContextType extends AuthState {
   unlockWithHello: (password: string) => Promise<{ success: boolean; error?: string }>;
   unlockWithSecurityKey: (keyId: string, password: string, pin?: string) => Promise<{ success: boolean; error?: string }>;
   refreshUnlockMethods: () => Promise<void>;
+  refreshTravelMode: () => Promise<void>;
   lockVault: () => Promise<void>;
   panicLock: () => Promise<void>;
 }
@@ -68,6 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     authFlow: 'idle',
     vaultLocked: false,
     unlockMethods: [],
+    travelMode: false,
   });
 
   // Check for existing account on mount
@@ -131,6 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         authFlow: 'idle',
         vaultLocked: false,
         unlockMethods: ['password'],
+        travelMode: false,
       });
       requestPrefsSync();
 
@@ -183,7 +187,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         authFlow: 'idle',
         vaultLocked: false,
         unlockMethods: unlockInfo.methods.includes('password') ? unlockInfo.methods : ['password', ...unlockInfo.methods],
+        travelMode: false,
       });
+      try {
+        const travel = await api.getTravelMode();
+        setState(prev => ({ ...prev, travelMode: travel }));
+      } catch { /* ignore */ }
       requestPrefsSync();
 
       return { success: true };
@@ -209,6 +218,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       vaultLocked: false,
     }));
+    api.getTravelMode()
+      .then((travel) => setState(prev => ({ ...prev, travelMode: travel })))
+      .catch(() => {});
     requestPrefsSync();
   }, []);
 
@@ -264,6 +276,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch { /* ignore */ }
   }, []);
 
+  const refreshTravelMode = useCallback(async () => {
+    try {
+      const travel = await api.getTravelMode();
+      setState(prev => ({ ...prev, travelMode: travel }));
+    } catch {
+      setState(prev => ({ ...prev, travelMode: false }));
+    }
+  }, []);
+
   const lockVault = useCallback(async () => {
     await api.lockVault().catch(() => {});
     const { clearSecureClipboard } = await import('@/lib/secure-clipboard');
@@ -307,6 +328,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       authFlow: 'idle',
       vaultLocked: false,
       unlockMethods: [],
+      travelMode: false,
     });
   }, []);
 
@@ -343,6 +365,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       authFlow: 'setup_account',
       vaultLocked: false,
       unlockMethods: [],
+      travelMode: false,
     });
   }, []);
 
@@ -350,22 +373,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [lockSettings, setLockSettings] = useState<{ autoLock: boolean; timeoutMs: number } | null>(null);
 
   useEffect(() => {
-    if (!state.isAuthenticated) {
+    if (!state.isAuthenticated || state.vaultLocked) {
       setLockSettings(null);
       return;
     }
     let active = true;
-    api.getSettings()
-      .then((s) => {
+    Promise.all([api.getSettings(), api.getTravelMode()])
+      .then(([s, travel]) => {
         if (!active) return;
+        const effectiveMins = travel
+          ? Math.min(s.lock_timeout_mins || 5, 2)
+          : (s.lock_timeout_mins || 5);
         setLockSettings({
           autoLock: s.auto_lock,
-          timeoutMs: Math.max(1, s.lock_timeout_mins) * 60000,
+          timeoutMs: Math.max(1, effectiveMins) * 60000,
         });
       })
       .catch(() => { });
     return () => { active = false; };
-  }, [state.isAuthenticated]);
+  }, [state.isAuthenticated, state.vaultLocked, state.travelMode]);
 
   useEffect(() => {
     if (!state.isAuthenticated || state.vaultLocked || !lockSettings?.autoLock) return;
@@ -413,7 +439,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ...state, createAccount, logIn, logOut,
       completeOnboarding, updateUser, setAuthFlow, resetToSetup,
       unlockWithPassword, unlockWithPin, unlockWithHello, unlockWithSecurityKey,
-      refreshUnlockMethods, lockVault, panicLock,
+      refreshUnlockMethods, refreshTravelMode, lockVault, panicLock,
     }}>
       {children}
     </AuthContext.Provider>

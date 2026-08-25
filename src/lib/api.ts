@@ -111,6 +111,7 @@ export interface AppSettings {
   language?: string;
   ui_font?: string;
   hibp_audit_enabled?: boolean;
+  travel_mode?: boolean;
 }
 
 export interface OtpCode {
@@ -186,6 +187,9 @@ export const api = {
   logOut: () => invoke<void>('log_out'),
   lockVault: () => invoke<void>('lock_vault'),
   panicLock: () => invoke<void>('panic_lock'),
+  getTravelMode: () => invoke<boolean>('get_travel_mode'),
+  setTravelMode: (enabled: boolean, password?: string | null) =>
+    invoke<void>('set_travel_mode', { enabled, password: password ?? null }),
   getUser: () => invoke<User | null>('get_user'),
   setupMasterPasswordFromLegacy: (password: string) =>
     invoke<User>('setup_master_password_from_legacy', { password }),

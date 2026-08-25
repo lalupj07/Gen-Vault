@@ -148,6 +148,9 @@ pub struct AppSettings {
     pub ui_font: String,
     #[serde(default = "default_true")]
     pub hibp_audit_enabled: bool,
+    /// Temporary lockdown for travel / shared spaces (Phase 1 privacy).
+    #[serde(default)]
+    pub travel_mode: bool,
 }
 
 fn default_true() -> bool {
@@ -176,6 +179,7 @@ impl Default for AppSettings {
             language: default_language(),
             ui_font: default_ui_font(),
             hibp_audit_enabled: false,
+            travel_mode: false,
         }
     }
 }
