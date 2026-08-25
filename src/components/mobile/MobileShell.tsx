@@ -7,7 +7,7 @@ import {
 import { AnimatePresence, motion, useReducedMotion, type Transition } from 'framer-motion';
 import {
   Home, Lock, LayoutDashboard, KeyRound, Vault,
-  Smartphone, QrCode, Grid3X3, Sun, Moon, Wrench, ChevronLeft, Info, User,
+  Smartphone, QrCode, Grid3X3, Sun, Moon, Wrench, ChevronLeft, Info, User, ShieldAlert,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
@@ -79,7 +79,7 @@ function isRtl() {
 }
 
 export default function MobileShell() {
-  const { user, lockVault } = useAuth();
+  const { user, lockVault, panicLock, travelMode } = useAuth();
   const { theme, setTheme } = useTheme();
   const { t } = useI18n();
   const reduceMotion = useReducedMotion();
@@ -322,9 +322,13 @@ export default function MobileShell() {
     pushNav({ stack: 'tabs', tab: next, featureView, toolId, entryId: null });
   };
 
+  const visibleEntries = travelMode
+    ? entries.filter((e) => !(e.tags ?? []).includes('travel-hide'))
+    : entries;
+
   const featureTitle =
     MORE_ITEMS.find((i) => i.id === featureView)?.label ?? 'Feature';
-  const selected = entries.find((e) => e.id === entryId) ?? null;
+  const selected = visibleEntries.find((e) => e.id === entryId) ?? null;
   const headerSub =
     stack === 'feature' ? featureTitle
       : stack === 'add' ? t('mobile.add.title')
@@ -450,6 +454,15 @@ export default function MobileShell() {
           </button>
           <button
             type="button"
+            onClick={() => void panicLock()}
+            className="min-h-[44px] min-w-[44px] rounded-full m3-glass flex items-center justify-center text-accent-danger active:scale-95 transition-[color,transform] duration-200"
+            aria-label="Panic lock"
+            title="Lock vault and wipe staging"
+          >
+            <ShieldAlert className="w-5 h-5" />
+          </button>
+          <button
+            type="button"
             onClick={() => lockVault()}
             className="min-h-[44px] min-w-[44px] rounded-full m3-glass flex items-center justify-center text-[color:var(--md-on-surface-variant)] active:scale-95 transition-[color,transform] duration-200"
             aria-label={t('common.lock')}
@@ -463,6 +476,20 @@ export default function MobileShell() {
         className="relative z-10 flex-1 overflow-y-auto overscroll-contain px-4 pb-28 touch-pan-y"
         style={dragStyle}
       >
+        {travelMode && stack === 'tabs' && (
+          <motion.div
+            className="mb-3 m3-glass px-3 py-2.5 border border-[color:var(--md-primary)]/25"
+            initial={reduceMotion ? false : { opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={SPRING_SOFT}
+          >
+            <p className="text-xs text-[color:var(--md-primary)] font-medium">Travel mode active</p>
+            <p className="text-[11px] text-[color:var(--md-on-surface-variant)] mt-0.5">
+              Sensitive entries hidden · export blocked · auto-lock capped at 2 min
+            </p>
+          </motion.div>
+        )}
+
         {showBackupNudge && stack === 'tabs' && (
           <motion.div
             className="mb-3 m3-glass px-3 py-3 flex flex-col gap-2"
@@ -544,7 +571,7 @@ export default function MobileShell() {
             ) : stack === 'tool' ? (
               <MobileToolView id={toolId} onCreated={refresh} />
             ) : stack === 'feature' ? (
-              renderFeature(featureView, appState, entries, refresh, openFeature)
+              renderFeature(featureView, appState, visibleEntries, refresh, openFeature)
             ) : (
               <>
                 {tab === 'home' && (
@@ -555,19 +582,19 @@ export default function MobileShell() {
                       <div className="h-16 rounded-2xl m3-glass animate-pulse" />
                     </div>
                   ) : (
-                    <Dashboard appState={appState} vaultEntries={entries as never} />
+                    <Dashboard appState={appState} vaultEntries={visibleEntries as never} />
                   )
                 )}
                 {tab === 'codes' && (
                   <MobileCodes
-                    entries={entries}
+                    entries={visibleEntries}
                     loading={loading}
                     onOpenEntry={openEntry}
                   />
                 )}
                 {tab === 'vault' && (
                   <MobileVaultList
-                    entries={entries}
+                    entries={visibleEntries}
                     loading={loading}
                     onOpenEntry={openEntry}
                     onRefresh={refresh}

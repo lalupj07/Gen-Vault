@@ -34,6 +34,7 @@ fn wipe_all_staging_best_effort() {
 pub(crate) fn execute_panic_lock() -> Result<(), String> {
     #[cfg(windows)]
     wipe_all_staging_best_effort();
+    guest::wipe_guest_staging();
     lock_vault()
 }
 

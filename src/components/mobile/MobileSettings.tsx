@@ -1,14 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Fingerprint, Download, Upload, Info, Sun, Moon, Monitor, Trash2 } from 'lucide-react';
-import { api, type AppSettings } from '@/lib/api';
+import { useCallback, useEffect, useState } from 'react';
+import { Fingerprint, Download, Upload, Info, Sun, Moon, Monitor, Trash2, Plane, ShieldAlert, UserCheck } from 'lucide-react';
+import { api, type AppSettings, type GuestGrantPublic, type GuestKind, type LockedFolder, type MediaItem } from '@/lib/api';
 import { PRODUCT } from '@/lib/company';
 import { cn } from '@/lib/utils';
 import { useTheme, type Theme } from '@/lib/theme';
 import { useI18n } from '@/lib/i18n';
 import { useFont, type UiFont } from '@/lib/font';
 import { useAuth } from '@/lib/auth';
+import { promptMasterPassword } from '@/lib/prompt-master-password';
 import { markBackupDone, backupReminderLabel, backupReminderDue } from '@/lib/backup-reminder';
 import MobileTimeSync from './MobileTimeSync';
 import AccountRecoveryScreen from '@/components/AccountRecoveryScreen';
@@ -22,7 +23,7 @@ export default function MobileSettings({ onRefresh, onOpenAbout }: Props) {
   const { theme, setTheme } = useTheme();
   const { t, locale, setLocale, locales } = useI18n();
   const { font, setFont, fonts } = useFont();
-  const { refreshUnlockMethods, user, resetToSetup, travelMode } = useAuth();
+  const { refreshUnlockMethods, user, resetToSetup, travelMode, refreshTravelMode, vaultLocked } = useAuth();
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [helloOk, setHelloOk] = useState(false);
   const [hasHello, setHasHello] = useState(false);
@@ -31,6 +32,29 @@ export default function MobileSettings({ onRefresh, onOpenAbout }: Props) {
   const [passphrase, setPassphrase] = useState('');
   const [busy, setBusy] = useState(false);
   const [showRecovery, setShowRecovery] = useState(false);
+
+  const [travelLoading, setTravelLoading] = useState(false);
+  const [travelError, setTravelError] = useState('');
+
+  const [duressEnrolled, setDuressEnrolled] = useState(false);
+  const [duressLoading, setDuressLoading] = useState(false);
+  const [duressError, setDuressError] = useState('');
+  const [duressMessage, setDuressMessage] = useState('');
+  const [showDuressEnroll, setShowDuressEnroll] = useState(false);
+  const [duressPassword, setDuressPassword] = useState('');
+  const [duressConfirm, setDuressConfirm] = useState('');
+
+  const [guestGrants, setGuestGrants] = useState<GuestGrantPublic[]>([]);
+  const [guestLoading, setGuestLoading] = useState(false);
+  const [guestError, setGuestError] = useState('');
+  const [guestMessage, setGuestMessage] = useState('');
+  const [showGuestCreate, setShowGuestCreate] = useState(false);
+  const [guestKind, setGuestKind] = useState<GuestKind>('file');
+  const [guestItemId, setGuestItemId] = useState('');
+  const [guestLabel, setGuestLabel] = useState('');
+  const [guestPassphrase, setGuestPassphrase] = useState('');
+  const [guestTtlMins, setGuestTtlMins] = useState(15);
+  const [guestItems, setGuestItems] = useState<{ id: string; label: string }[]>([]);
 
   const load = async () => {
     try {
@@ -42,14 +66,52 @@ export default function MobileSettings({ onRefresh, onOpenAbout }: Props) {
       setSettings(s);
       setHelloOk(avail);
       setHasHello(info.methods.includes('hello'));
+      setDuressEnrolled(await api.hasDuressEnrolled().catch(() => false));
     } catch {
       /* ignore */
     }
   };
 
+  const refreshGuestGrants = useCallback(async () => {
+    if (vaultLocked) return;
+    setGuestLoading(true);
+    setGuestError('');
+    try {
+      setGuestGrants(await api.guestGrantList());
+    } catch (e) {
+      setGuestError(e instanceof Error ? e.message : 'Failed to load guest grants');
+    }
+    setGuestLoading(false);
+  }, [vaultLocked]);
+
+  const loadGuestItems = useCallback(async (kind: GuestKind) => {
+    try {
+      if (kind === 'folder') {
+        const rows = await api.folderLockList();
+        setGuestItems(rows.map((r: LockedFolder) => ({ id: r.id, label: r.display_name })));
+      } else if (kind === 'file') {
+        const rows = await api.fileLockList();
+        setGuestItems(rows.map((r) => ({ id: r.id, label: r.display_name })));
+      } else {
+        const rows = await api.mediaVaultList();
+        setGuestItems(rows.map((r: MediaItem) => ({ id: r.id, label: r.title || r.original_name })));
+      }
+    } catch {
+      setGuestItems([]);
+    }
+  }, []);
+
   useEffect(() => {
     load();
   }, []);
+
+  useEffect(() => {
+    if (!vaultLocked) void refreshGuestGrants();
+  }, [vaultLocked, refreshGuestGrants]);
+
+  useEffect(() => {
+    if (showGuestCreate && !vaultLocked) void loadGuestItems(guestKind);
+  }, [showGuestCreate, guestKind, vaultLocked, loadGuestItems]);
 
   if (showRecovery) {
     return (
@@ -69,7 +131,8 @@ export default function MobileSettings({ onRefresh, onOpenAbout }: Props) {
 
   const saveTimeout = async (mins: number) => {
     if (!settings) return;
-    const next = { ...settings, lock_timeout_mins: mins, auto_lock: mins > 0 };
+    const capped = travelMode ? Math.min(mins, 2) : mins;
+    const next = { ...settings, lock_timeout_mins: capped, auto_lock: capped > 0 };
     setSettings(next);
     try {
       await api.updateSettings(next);
@@ -78,6 +141,144 @@ export default function MobileSettings({ onRefresh, onOpenAbout }: Props) {
       setErr(e instanceof Error ? e.message : 'Update failed');
     }
   };
+
+  const handleTravelMode = async (enabled: boolean) => {
+    setTravelError('');
+    setTravelLoading(true);
+    try {
+      if (enabled) {
+        await api.setTravelMode(true);
+        if (settings && settings.lock_timeout_mins > 2) {
+          await saveTimeout(2);
+        }
+      } else {
+        const password = await promptMasterPassword('Enter master password to disable travel mode:');
+        if (!password) {
+          setTravelLoading(false);
+          return;
+        }
+        await api.setTravelMode(false, password);
+      }
+      await refreshTravelMode();
+      setMsg(enabled ? 'Travel mode enabled' : 'Travel mode disabled');
+    } catch (e) {
+      setTravelError(e instanceof Error ? e.message : 'Travel mode update failed');
+    }
+    setTravelLoading(false);
+  };
+
+  const handleDuressEnroll = async () => {
+    if (duressPassword.length < 12) {
+      setDuressError('Duress password must be at least 12 characters');
+      return;
+    }
+    if (duressPassword !== duressConfirm) {
+      setDuressError('Passwords do not match');
+      return;
+    }
+    setDuressError('');
+    setDuressMessage('');
+    const masterPassword = await promptMasterPassword('Enter master password to enroll duress password:');
+    if (!masterPassword) return;
+    if (masterPassword === duressPassword) {
+      setDuressError('Duress password must differ from master password');
+      return;
+    }
+    setDuressLoading(true);
+    try {
+      await api.enrollDuressPassword(masterPassword, duressPassword);
+      setDuressMessage('Duress password enrolled');
+      setShowDuressEnroll(false);
+      setDuressPassword('');
+      setDuressConfirm('');
+      setDuressEnrolled(true);
+    } catch (e) {
+      setDuressError(e instanceof Error ? e.message : 'Failed to enroll duress password');
+    }
+    setDuressLoading(false);
+  };
+
+  const handleDuressRemove = async () => {
+    setDuressError('');
+    setDuressMessage('');
+    const masterPassword = await promptMasterPassword('Enter master password to remove duress password:');
+    if (!masterPassword) return;
+    setDuressLoading(true);
+    try {
+      await api.removeDuressPassword(masterPassword);
+      setDuressMessage('Duress password removed');
+      setShowDuressEnroll(false);
+      setDuressPassword('');
+      setDuressConfirm('');
+      setDuressEnrolled(false);
+    } catch (e) {
+      setDuressError(e instanceof Error ? e.message : 'Failed to remove duress password');
+    }
+    setDuressLoading(false);
+  };
+
+  const handleGuestRevoke = async (id: string) => {
+    setGuestError('');
+    setGuestMessage('');
+    setGuestLoading(true);
+    try {
+      await api.guestGrantRevoke(id);
+      setGuestMessage('Grant revoked');
+      await refreshGuestGrants();
+    } catch (e) {
+      setGuestError(e instanceof Error ? e.message : 'Revoke failed');
+    }
+    setGuestLoading(false);
+  };
+
+  const handleGuestCreate = async () => {
+    if (!guestItemId) {
+      setGuestError('Enter an item ID');
+      return;
+    }
+    if (!guestLabel.trim()) {
+      setGuestError('Enter a label for this grant');
+      return;
+    }
+    if (guestPassphrase.length < 12) {
+      setGuestError('Passphrase must be at least 12 characters');
+      return;
+    }
+    setGuestError('');
+    setGuestMessage('');
+    setGuestLoading(true);
+    try {
+      const grant = await api.guestGrantCreate(
+        guestKind,
+        guestItemId,
+        guestLabel.trim(),
+        guestPassphrase,
+        guestTtlMins,
+      );
+      setGuestMessage(`Grant created — share ID: ${grant.id}`);
+      setShowGuestCreate(false);
+      setGuestItemId('');
+      setGuestLabel('');
+      setGuestPassphrase('');
+      setGuestTtlMins(15);
+      await refreshGuestGrants();
+    } catch (e) {
+      setGuestError(e instanceof Error ? e.message : 'Create grant failed');
+    }
+    setGuestLoading(false);
+  };
+
+  const formatGuestExpiry = (expiresAt: number) => {
+    const ms = expiresAt * 1000 - Date.now();
+    if (ms <= 0) return 'Expired';
+    const mins = Math.ceil(ms / 60000);
+    if (mins < 60) return `${mins} min remaining`;
+    return `${Math.ceil(mins / 60)} hr remaining`;
+  };
+
+  const effectiveLockMins = travelMode
+    ? Math.min(settings?.lock_timeout_mins ?? 5, 2)
+    : (settings?.lock_timeout_mins ?? 5);
 
   const toggleBiometric = async () => {
     setErr('');
@@ -270,7 +471,7 @@ export default function MobileSettings({ onRefresh, onOpenAbout }: Props) {
         <div className="p-4">
           <p className="m3-title-md mb-2">{t('mobile.settings.autolock')}</p>
           <div className="flex flex-wrap gap-2">
-            {[1, 5, 15, 30].map((m) => (
+            {(travelMode ? [1, 2] : [1, 5, 15, 30]).map((m) => (
               <button
                 key={m}
                 type="button"
@@ -278,13 +479,270 @@ export default function MobileSettings({ onRefresh, onOpenAbout }: Props) {
                 className={cn(
                   'm3-chip',
                 )}
-                data-active={settings?.lock_timeout_mins === m ? 'true' : 'false'}
+                data-active={effectiveLockMins === m ? 'true' : 'false'}
               >
                 {m} min
               </button>
             ))}
           </div>
+          {travelMode && (
+            <p className="text-[11px] text-[color:var(--md-on-surface-variant)] mt-2">
+              Travel mode caps auto-lock at 2 minutes.
+            </p>
+          )}
         </div>
+      </section>
+
+      <section className="m3-glass p-4 space-y-3">
+        <div className="flex items-start gap-3">
+          <span className="w-10 h-10 rounded-[var(--m3-radius-md)] bg-[color:var(--md-primary-container)] flex items-center justify-center flex-shrink-0">
+            <Plane className="w-5 h-5 text-[color:var(--md-on-primary-container)]" />
+          </span>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="m3-title-md">Travel mode</p>
+                <p className="text-xs text-[color:var(--md-on-surface-variant)] mt-0.5">
+                  Temporary lockdown for travel. Disable requires master password.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={travelMode}
+                disabled={travelLoading || vaultLocked}
+                onClick={() => void handleTravelMode(!travelMode)}
+                className={cn(
+                  'relative w-12 h-7 rounded-full transition-colors duration-200 flex-shrink-0 disabled:opacity-40',
+                  travelMode ? 'bg-[color:var(--md-primary)]' : 'bg-[color:var(--md-outline)]'
+                )}
+              >
+                <span
+                  className={cn(
+                    'absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white transition-transform duration-200',
+                    travelMode && 'translate-x-5'
+                  )}
+                />
+              </button>
+            </div>
+            <p className="text-[11px] text-[color:var(--md-on-surface-variant)] mt-2">
+              Screen capture already blocked on Android (FLAG_SECURE).
+            </p>
+            {travelError && (
+              <p className="text-xs text-accent-danger mt-2">{travelError}</p>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="m3-glass p-4 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-start gap-3 min-w-0">
+            <span className="w-10 h-10 rounded-[var(--m3-radius-md)] bg-[color:var(--md-primary-container)] flex items-center justify-center flex-shrink-0">
+              <ShieldAlert className="w-5 h-5 text-[color:var(--md-on-primary-container)]" />
+            </span>
+            <div>
+              <p className="m3-title-md">Duress password</p>
+              <p className="text-xs text-[color:var(--md-on-surface-variant)] mt-0.5">
+                {duressEnrolled ? 'Enrolled — decoy vault active' : 'Not enrolled'}
+              </p>
+            </div>
+          </div>
+          {!vaultLocked && !duressEnrolled && (
+            <button
+              type="button"
+              onClick={() => { setShowDuressEnroll((v) => !v); setDuressError(''); setDuressMessage(''); }}
+              disabled={duressLoading}
+              className="text-xs px-3 py-1.5 rounded-lg bg-[color:var(--md-primary-container)] text-[color:var(--md-on-primary-container)] disabled:opacity-50"
+            >
+              {showDuressEnroll ? 'Cancel' : 'Set up'}
+            </button>
+          )}
+        </div>
+        <p className="text-xs text-[color:var(--md-on-surface-variant)]">
+          A separate password unlocks a harmless decoy vault when you are compelled to reveal your password.
+        </p>
+        {vaultLocked ? (
+          <p className="text-sm text-[color:var(--md-on-surface-variant)]">Unlock vault to manage duress password.</p>
+        ) : (
+          <>
+            {duressEnrolled && (
+              <button
+                type="button"
+                onClick={() => void handleDuressRemove()}
+                disabled={duressLoading}
+                className="w-full min-h-[44px] rounded-[var(--m3-radius-lg)] border border-accent-danger/40 text-sm font-medium text-accent-danger disabled:opacity-50"
+              >
+                {duressLoading ? 'Removing…' : 'Remove duress password'}
+              </button>
+            )}
+            {showDuressEnroll && !duressEnrolled && (
+              <div className="space-y-2">
+                <input
+                  type="password"
+                  autoComplete="off"
+                  placeholder="New duress password (12+ characters)"
+                  value={duressPassword}
+                  onChange={(e) => setDuressPassword(e.target.value)}
+                  className="m3-field text-sm"
+                />
+                <input
+                  type="password"
+                  autoComplete="off"
+                  placeholder="Confirm duress password"
+                  value={duressConfirm}
+                  onChange={(e) => setDuressConfirm(e.target.value)}
+                  className="m3-field text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => void handleDuressEnroll()}
+                  disabled={duressLoading}
+                  className="w-full min-h-[44px] rounded-[var(--m3-radius-lg)] m3-fab !w-full !h-auto text-sm font-semibold disabled:opacity-50"
+                >
+                  {duressLoading ? 'Enrolling…' : 'Enroll duress password'}
+                </button>
+              </div>
+            )}
+            {duressError && <p className="text-xs text-accent-danger">{duressError}</p>}
+            {duressMessage && <p className="text-xs text-cyber-emerald">{duressMessage}</p>}
+          </>
+        )}
+      </section>
+
+      <section className="m3-glass p-4 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <p className="m3-title-md">Guest access grants</p>
+          {!vaultLocked && (
+            <button
+              type="button"
+              onClick={() => { setShowGuestCreate((v) => !v); setGuestError(''); setGuestMessage(''); }}
+              disabled={guestLoading}
+              className="text-xs px-3 py-1.5 rounded-lg bg-[color:var(--md-primary-container)] text-[color:var(--md-on-primary-container)] disabled:opacity-50"
+            >
+              {showGuestCreate ? 'Cancel' : 'Create'}
+            </button>
+          )}
+        </div>
+        <p className="text-xs text-[color:var(--md-on-surface-variant)]">
+          Time-limited passphrase access to locked folders, files, or media — guests unlock from the login screen.
+        </p>
+        {vaultLocked ? (
+          <p className="text-sm text-[color:var(--md-on-surface-variant)]">Unlock vault to manage guest grants.</p>
+        ) : (
+          <>
+            {showGuestCreate && (
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="text-xs text-[color:var(--md-on-surface-variant)]">
+                    Kind
+                    <select
+                      value={guestKind}
+                      onChange={(e) => { setGuestKind(e.target.value as GuestKind); setGuestItemId(''); }}
+                      className="m3-field text-sm mt-1"
+                    >
+                      <option value="folder">Folder</option>
+                      <option value="file">File</option>
+                      <option value="media">Media</option>
+                    </select>
+                  </label>
+                  <label className="text-xs text-[color:var(--md-on-surface-variant)]">
+                    TTL (minutes)
+                    <input
+                      type="number"
+                      min={1}
+                      max={60}
+                      value={guestTtlMins}
+                      onChange={(e) => setGuestTtlMins(Math.min(60, Math.max(1, Number(e.target.value) || 15)))}
+                      className="m3-field text-sm mt-1"
+                    />
+                  </label>
+                </div>
+                {guestItems.length > 0 ? (
+                  <label className="text-xs text-[color:var(--md-on-surface-variant)] block">
+                    Locked item
+                    <select
+                      value={guestItemId}
+                      onChange={(e) => setGuestItemId(e.target.value)}
+                      className="m3-field text-sm mt-1"
+                    >
+                      <option value="">Select item…</option>
+                      {guestItems.map((item) => (
+                        <option key={item.id} value={item.id}>{item.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                ) : (
+                  <label className="text-xs text-[color:var(--md-on-surface-variant)] block">
+                    Item ID
+                    <input
+                      type="text"
+                      value={guestItemId}
+                      onChange={(e) => setGuestItemId(e.target.value)}
+                      placeholder="Locked item UUID"
+                      className="m3-field text-sm mt-1 font-mono"
+                    />
+                  </label>
+                )}
+                <input
+                  type="text"
+                  placeholder="Grant label"
+                  value={guestLabel}
+                  onChange={(e) => setGuestLabel(e.target.value)}
+                  className="m3-field text-sm"
+                />
+                <input
+                  type="password"
+                  placeholder="Guest passphrase (min 12 chars)"
+                  value={guestPassphrase}
+                  onChange={(e) => setGuestPassphrase(e.target.value)}
+                  autoComplete="new-password"
+                  className="m3-field text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => void handleGuestCreate()}
+                  disabled={guestLoading}
+                  className="w-full min-h-[44px] rounded-[var(--m3-radius-lg)] m3-fab !w-full !h-auto text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  <UserCheck className="w-4 h-4" />
+                  {guestLoading ? 'Creating…' : 'Create guest grant'}
+                </button>
+              </div>
+            )}
+            {guestGrants.length === 0 ? (
+              <p className="text-sm text-[color:var(--md-on-surface-variant)]">No active guest grants</p>
+            ) : (
+              <div className="space-y-2">
+                {guestGrants.map((g) => (
+                  <div key={g.id} className="p-3 rounded-[var(--m3-radius-md)] bg-[color:var(--md-surface-container)] border border-[color:var(--md-outline-variant)]">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{g.label}</p>
+                        <p className="text-[10px] text-[color:var(--md-on-surface-variant)] mt-0.5">
+                          {g.kind} · {formatGuestExpiry(g.expires_at)}
+                        </p>
+                        <p className="text-[10px] text-[color:var(--md-on-surface-variant)] font-mono truncate mt-1" title={g.id}>
+                          ID: {g.id}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void handleGuestRevoke(g.id)}
+                        disabled={guestLoading}
+                        className="text-xs px-2 py-1 rounded-lg text-accent-danger border border-accent-danger/30 disabled:opacity-50"
+                      >
+                        Revoke
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {guestError && <p className="text-xs text-accent-danger">{guestError}</p>}
+            {guestMessage && <p className="text-xs text-cyber-emerald">{guestMessage}</p>}
+          </>
+        )}
       </section>
 
       <section className="m3-glass p-4 space-y-3">

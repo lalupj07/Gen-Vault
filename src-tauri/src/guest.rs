@@ -444,6 +444,15 @@ pub fn guest_unlock(grant_id: &str, passphrase: &str) -> Result<GuestUnlockResul
     })
 }
 
+/// Best-effort wipe of guest unlock staging (panic lock / session end).
+pub fn wipe_guest_staging() {
+    if let Ok(staging_root) = store::data_dir_public().map(|d| d.join("guest-staging")) {
+        if staging_root.exists() {
+            let _ = wipe_dir_tree(&staging_root);
+        }
+    }
+}
+
 /// Wipe all guest grant artifacts (used during full vault erase).
 pub fn wipe_all_guest_data() -> Result<(), GuestError> {
     let path = grants_path()?;

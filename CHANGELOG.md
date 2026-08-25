@@ -23,6 +23,11 @@ Phase 1: Standout Privacy (Windows v1) — panic lock, travel mode, guest unlock
 - Settings and sidebar UI for all four features
 - Design spec: `docs/superpowers/specs/2026-08-25-phase1-standout-privacy-design.md`
 
+#### Standout Privacy (Android)
+- **Phase 1 privacy UI** — panic lock (header + profile), travel mode toggle, duress password enroll/remove, guest access grants (create/revoke/list)
+- Travel mode hides `travel-hide` tagged entries and shows banner; export/erase remain blocked
+- Panic lock also wipes guest unlock staging on all platforms
+
 ### Security
 
 - Panic lock requires no password (availability under duress); relocks all lock modules and clears secure clipboard
@@ -32,7 +37,7 @@ Phase 1: Standout Privacy (Windows v1) — panic lock, travel mode, guest unlock
 
 ### Notes
 
-- Android Panic tile / Travel mode deferred
+- Android Phase 1 privacy UI shipped (panic, travel, guest grants, duress); no global panic hotkey on mobile
 - Remote wipe and multi-guest sessions out of scope for v1
 
 ---

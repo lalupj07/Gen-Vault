@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import {
   User, Shield, Fingerprint, KeyRound, Calendar, Clock,
-  Award, Edit3, CheckCircle2, Lock, Vault, LogOut,
+  Award, Edit3, CheckCircle2, Lock, Vault, LogOut, ShieldAlert,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { api } from '@/lib/api';
@@ -22,7 +22,7 @@ export default function MobileProfile({
   totpCount = 0,
   securityScore = 0,
 }: Props) {
-  const { user, updateUser, logOut, lockVault } = useAuth();
+  const { user, updateUser, logOut, lockVault, panicLock } = useAuth();
   const { t } = useI18n();
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(user?.displayName || '');
@@ -172,13 +172,21 @@ export default function MobileProfile({
         </button>
         <button
           type="button"
-          onClick={() => logOut()}
-          className="flex-1 min-h-[48px] rounded-[var(--m3-radius-lg)] bg-[color:var(--md-error)]/15 text-[color:var(--md-error)] text-sm font-medium flex items-center justify-center gap-2"
+          onClick={() => void panicLock()}
+          className="flex-1 min-h-[48px] rounded-[var(--m3-radius-lg)] border border-accent-danger/40 text-sm font-medium text-accent-danger flex items-center justify-center gap-1.5"
         >
-          <LogOut className="w-4 h-4" />
-          Sign out
+          <ShieldAlert className="w-4 h-4" />
+          Panic lock
         </button>
       </div>
+      <button
+        type="button"
+        onClick={() => logOut()}
+        className="w-full min-h-[48px] rounded-[var(--m3-radius-lg)] bg-[color:var(--md-error)]/15 text-[color:var(--md-error)] text-sm font-medium flex items-center justify-center gap-2"
+      >
+        <LogOut className="w-4 h-4" />
+        Sign out
+      </button>
     </div>
   );
 }

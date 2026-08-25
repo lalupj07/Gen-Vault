@@ -3,7 +3,7 @@
 **Date:** 2026-08-25  
 **Status:** Implemented (Windows v1) — implementation plan: `docs/superpowers/plans/2026-08-25-phase1-standout-privacy.md`  
 **Product:** GenVault (GenXis Innovations)  
-**Platform:** Windows desktop (Tauri 2) v1; Android follow-ups deferred  
+**Platform:** Windows desktop (Tauri 2) v1; Android Phase 1 privacy UI implemented  
 **Related:** Ships after Media Vault (v2.1.0). Complements lock suite; does not replace Folder/File/Media Lock.
 
 ## Goal
@@ -36,7 +36,7 @@ Ship four privacy features that make GenVault feel like a **local security encla
 | Duress | Second wrapped VMK path `duress_key.enc`; opens `duress_vault.enc` + empty-ish decoy SQLite |
 | Duress UX | Identical unlock UI; no “wrong vault” hint — timing should match real unlock |
 | Drivers | Forbidden |
-| Android | Panic tile / Travel deferred |
+| Android | Phase 1 privacy UI implemented (panic, travel, guest grants, duress); FLAG_SECURE always-on |
 
 ## Non-goals (v1)
 
@@ -211,9 +211,9 @@ store + folder_lock / file_lock / media_vault services
 ## Open follow-ups
 
 - Wipe-on-duress (optional nuclear enroll)  
-- Android panic tile  
 - Configurable panic hotkey UI  
 - Indistinguishable dual-KDF timing  
+- Android global panic hotkey / tile (UI controls shipped in v2.2.0)
 
 ## Acceptance for this design
 
