@@ -79,7 +79,32 @@ fn from_hex(b: u8) -> Option<u8> {
 }
 
 pub fn find_in_args(args: &[String]) -> Option<FileLockDeepLink> {
-    args.iter().find_map(|a| parse_file_lock_url(a))
+    if let Some(d) = args.iter().find_map(|a| parse_file_lock_url(a)) {
+        return Some(d);
+    }
+    let mut paths = Vec::new();
+    let mut i = 0;
+    while i < args.len() {
+        if args[i] == "--lock-file" {
+            if let Some(path) = args.get(i + 1) {
+                if !path.is_empty() && !path.starts_with('-') {
+                    paths.push(path.clone());
+                    i += 2;
+                    continue;
+                }
+            }
+        }
+        i += 1;
+    }
+    if paths.is_empty() {
+        return None;
+    }
+    Some(FileLockDeepLink {
+        action: "lock".into(),
+        path: paths.first().cloned(),
+        paths,
+        id: None,
+    })
 }
 
 #[cfg(test)]

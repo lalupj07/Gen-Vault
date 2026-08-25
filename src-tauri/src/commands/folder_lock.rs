@@ -176,11 +176,19 @@ pub fn folder_lock_settings_set(auto_lock_mins: u32) -> Result<FolderLockSetting
     Ok(settings)
 }
 
-/// Wipe orphan staging directories (crash recovery). Safe without vault unlock.
+/// Wipe orphan staging (IPC). Requires vault unlock so a compromised webview
+/// cannot destroy plaintext while folders are intentionally unlocked.
+/// Process startup uses `wipe_folder_lock_orphans_on_startup` instead (no session yet).
 #[tauri::command]
 pub fn folder_lock_crash_recover() -> Result<(), String> {
     require_windows()?;
-    // Best-effort: if data dir unavailable, skip.
+    let _key = get_key()?;
+    wipe_folder_lock_orphans_on_startup()
+}
+
+/// Best-effort orphan wipe at process start (no unlock session exists yet).
+pub fn wipe_folder_lock_orphans_on_startup() -> Result<(), String> {
+    require_windows()?;
     let Ok(dir) = data_dir() else {
         return Ok(());
     };

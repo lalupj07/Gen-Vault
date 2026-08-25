@@ -272,6 +272,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // ===== Log Out =====
   const logOut = useCallback(async () => {
+    const { clearSecureClipboard } = await import('@/lib/secure-clipboard');
+    await clearSecureClipboard().catch(() => {});
     api.logOut().catch(() => {});
     setState({
       user: null,

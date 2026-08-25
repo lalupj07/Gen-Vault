@@ -139,6 +139,9 @@ export default function UnlockScreen() {
                   value={secret}
                   onChange={(e) => setSecret(e.target.value)}
                   placeholder="Enter your master password"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck={false}
                   autoFocus
                   className="m3-field pl-10 pr-12"
                 />
@@ -222,6 +225,7 @@ export default function UnlockScreen() {
                         value={keyPin}
                         onChange={(e) => setKeyPin(e.target.value)}
                         placeholder="Key PIN (if required)"
+                        autoComplete="off"
                         className="m3-field text-sm"
                       />
                       <button

@@ -52,13 +52,12 @@ New-Item -Path $shellKey -Force | Out-Null
 Set-ItemProperty -Path $shellKey -Name "(default)" -Value "Lock with GenVault"
 Set-ItemProperty -Path $shellKey -Name "Icon" -Value "`"$exe`""
 New-Item -Path "$shellKey\command" -Force | Out-Null
-# %V = selected folder path. Launch via protocol so deep-link parser runs.
-$cmd = "powershell.exe -NoProfile -WindowStyle Hidden -Command `"Start-Process 'genvault://folder-lock?action=lock&path=' + [uri]::EscapeDataString('%V')`""
-Set-ItemProperty -Path "$shellKey\command" -Name "(default)" -Value $cmd
+# Direct argv — no PowerShell (hijack / injection surface). %V = selected folder.
+Set-ItemProperty -Path "$shellKey\command" -Name "(default)" -Value "`"$exe`" --lock-folder `"%V`""
 
 # --- Explorer context menu on files (* path needs .NET; PowerShell/reg.exe wildcards break) ---
 $exeIcon = $exe
-$fileCmdValue = "powershell.exe -NoProfile -WindowStyle Hidden -Command `"Start-Process ('genvault://file-lock?action=lock&path=' + [uri]::EscapeDataString('%1'))`""
+$fileCmdValue = "`"$exe`" --lock-file `"%1`""
 $fileKey = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey('Software\Classes\*\shell\GenVaultFileLock')
 $fileKey.SetValue('', 'Lock with GenVault')
 $fileKey.SetValue('Icon', $exeIcon)

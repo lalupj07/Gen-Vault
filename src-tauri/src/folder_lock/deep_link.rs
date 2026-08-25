@@ -71,9 +71,25 @@ fn from_hex(b: u8) -> Option<u8> {
     }
 }
 
-/// Find a genvault://folder-lock URL among process args.
+/// Find a genvault://folder-lock URL or `--lock-folder <path>` among process args.
 pub fn find_in_args(args: &[String]) -> Option<FolderLockDeepLink> {
-    args.iter().find_map(|a| parse_folder_lock_url(a))
+    if let Some(d) = args.iter().find_map(|a| parse_folder_lock_url(a)) {
+        return Some(d);
+    }
+    for i in 0..args.len() {
+        if args[i] == "--lock-folder" {
+            if let Some(path) = args.get(i + 1) {
+                if !path.is_empty() && !path.starts_with('-') {
+                    return Some(FolderLockDeepLink {
+                        action: "lock".into(),
+                        path: Some(path.clone()),
+                        id: None,
+                    });
+                }
+            }
+        }
+    }
+    None
 }
 
 #[cfg(test)]

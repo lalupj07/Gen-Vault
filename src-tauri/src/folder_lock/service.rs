@@ -443,27 +443,63 @@ fn rel_path_str(root: &Path, file: &Path) -> Result<String, ServiceError> {
 
 fn collect_files(root: &Path) -> Result<Vec<(PathBuf, u64)>, ServiceError> {
     let mut out = Vec::new();
-    fn walk(dir: &Path, out: &mut Vec<(PathBuf, u64)>) -> Result<(), ServiceError> {
+    let root_canon = root
+        .canonicalize()
+        .unwrap_or_else(|_| root.to_path_buf());
+    fn walk(dir: &Path, root_canon: &Path, out: &mut Vec<(PathBuf, u64)>) -> Result<(), ServiceError> {
         for entry in fs::read_dir(dir)? {
             let entry = entry?;
             let path = entry.path();
             let name = entry.file_name();
             let name_str = name.to_string_lossy();
             if name_str == ".genvault-locked" || name_str == "README.txt" {
-                // Skip stub leftovers if re-locking somehow.
                 continue;
             }
-            if path.is_dir() {
-                walk(&path, out)?;
-            } else if path.is_file() {
+            let ft = entry.file_type()?;
+            if ft.is_symlink() || is_reparse_point(&path) {
+                return Err(ServiceError::Other(
+                    "Refusing to lock: folder contains a symlink or junction".into(),
+                ));
+            }
+            if ft.is_dir() {
+                let canon = path.canonicalize().unwrap_or_else(|_| path.clone());
+                if !canon.starts_with(root_canon) {
+                    return Err(ServiceError::Other(
+                        "Refusing to lock: path escapes folder root".into(),
+                    ));
+                }
+                walk(&path, root_canon, out)?;
+            } else if ft.is_file() {
+                let canon = path.canonicalize().unwrap_or_else(|_| path.clone());
+                if !canon.starts_with(root_canon) {
+                    return Err(ServiceError::Other(
+                        "Refusing to lock: path escapes folder root".into(),
+                    ));
+                }
                 let meta = entry.metadata()?;
                 out.push((path, meta.len()));
             }
         }
         Ok(())
     }
-    walk(root, &mut out)?;
+    walk(root, &root_canon, &mut out)?;
     Ok(out)
+}
+
+fn is_reparse_point(path: &Path) -> bool {
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
+        fs::symlink_metadata(path)
+            .map(|m| (m.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT) != 0)
+            .unwrap_or(false)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = path;
+        false
+    }
 }
 
 fn write_stub(dir: &Path, id: &str) -> Result<(), ServiceError> {

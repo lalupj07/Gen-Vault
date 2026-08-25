@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Copy, Check, Trash2, Star, Tag } from 'lucide-react';
 import { api, type VaultEntry } from '@/lib/api';
+import { promptMasterPassword } from '@/lib/prompt-master-password';
 import { cn } from '@/lib/utils';
 import { copySecure, clipboardClearSeconds } from '@/lib/secure-clipboard';
 import { vibrateOnOtpExpiry } from '@/lib/time-sync';
@@ -38,7 +39,7 @@ export default function MobileEntryDetail({ entry, onBack, onDeleted, onUpdated 
   }, [entry.id]);
 
   const revealNotes = async () => {
-    const password = window.prompt('Confirm master password to reveal notes:');
+    const password = await promptMasterPassword('Confirm master password to reveal notes:');
     if (!password) return;
     try {
       const n = await api.revealEntryNotes(entry.id, password);
@@ -249,7 +250,7 @@ export default function MobileEntryDetail({ entry, onBack, onDeleted, onUpdated 
             <button
               type="button"
               onClick={async () => {
-                const password = window.prompt('Confirm master password to reveal:');
+                const password = await promptMasterPassword('Confirm master password to reveal:');
                 if (!password) return;
                 try {
                   const pw = await api.revealEntrySecret(entry.id, password);

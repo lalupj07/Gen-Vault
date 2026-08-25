@@ -16,6 +16,7 @@ import { COMPANY, PRODUCT } from '@/lib/company';
 import { useTheme, type Theme } from '@/lib/theme';
 import { useFont, type UiFont } from '@/lib/font';
 import { api, type VaultEntry, type DeviceEntry, type Session as ApiSession, type SecurityEvent } from '@/lib/api';
+import { promptMasterPassword } from '@/lib/prompt-master-password';
 import QRScanner from '@/components/QRScanner';
 import {
   PasswordGeneratorPanel, PasswordHealthPanel, SecurityAuditPanel,
@@ -156,7 +157,7 @@ export function VaultView() {
     setEditNotes('');
     setEditNotesRevealed(false);
     setAttachError('');
-    const password = window.prompt('Confirm master password to reveal notes:');
+    const password = await promptMasterPassword('Confirm master password to reveal notes:');
     if (password) {
       try {
         setEditNotes(await api.revealEntryNotes(entry.id, password));
@@ -223,7 +224,7 @@ export function VaultView() {
 
   const handleDownloadAttachment = async (attachmentId: string, filename: string) => {
     if (!editingEntry) return;
-    const password = window.prompt('Enter master password to download this attachment:');
+    const password = await promptMasterPassword('Enter master password to download this attachment:');
     if (!password) return;
     try {
       const b64 = await api.exportEntryAttachment(editingEntry.id, attachmentId, password);
@@ -319,7 +320,7 @@ export function VaultView() {
               type="button"
               onClick={async () => {
                 if (!editingEntry) return;
-                const password = window.prompt('Confirm master password to reveal notes:');
+                const password = await promptMasterPassword('Confirm master password to reveal notes:');
                 if (!password) return;
                 try {
                   setEditNotes(await api.revealEntryNotes(editingEntry.id, password));
@@ -932,7 +933,7 @@ export function BiometricsView() {
     setTesting(true);
     setError('');
     setMessage('');
-    const password = window.prompt('Enter master password to test biometrics:');
+    const password = await promptMasterPassword('Enter master password to test biometrics:');
     if (!password) {
       setTesting(false);
       return;
@@ -1418,7 +1419,7 @@ export function SettingsView({ onReplayWelcomeTour }: { onReplayWelcomeTour?: ()
 
   // Import/Export handlers
   const handleExportAuthenticator = async () => {
-    const password = window.prompt('Confirm master password to export TOTP secrets:');
+    const password = await promptMasterPassword('Confirm master password to export TOTP secrets:');
     if (!password) return;
     try {
       const exportData = await api.exportVaultSecrets(password);
@@ -1451,7 +1452,14 @@ export function SettingsView({ onReplayWelcomeTour }: { onReplayWelcomeTour?: ()
     setImportError('');
     try {
       const trimmed = importData.trim();
-      if (trimmed.startsWith('otpauth://')) {
+      if (trimmed.startsWith('otpauth://') || /^https?:\/\//i.test(trimmed)) {
+        const { analyzeOtpauthUri, otpauthBlocked } = await import('@/lib/otpauth-safety');
+        const warnings = analyzeOtpauthUri(trimmed);
+        if (otpauthBlocked(warnings)) {
+          setImportError(warnings.find((w) => w.level === 'block')?.message || 'Import blocked');
+          setImportLoading(false);
+          return;
+        }
         await api.importOtpauthUri(trimmed, 'Imported');
       } else if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
         await api.importGoogleAuthenticator(trimmed, 'Imported');

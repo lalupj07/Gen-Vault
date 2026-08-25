@@ -74,6 +74,9 @@ pub fn recovery_kdf_input(answers: &[(String, String)]) -> String {
         .join("|")
 }
 fn data_dir() -> Result<PathBuf, StoreError> {
+    // Honor override in debug/test only — release builds ignore GENVAULT_DATA_DIR
+    // so same-user env injection cannot redirect vault I/O.
+    #[cfg(debug_assertions)]
     if let Ok(override_dir) = std::env::var("GENVAULT_DATA_DIR") {
         let dir = PathBuf::from(override_dir);
         fs::create_dir_all(&dir)?;

@@ -182,7 +182,10 @@ export default function OfflineAuthScreen() {
                 className="w-full pl-10 pr-4 py-3 rounded-xl bg-vault-black/50 border border-vault-border/40 text-vault-light text-sm focus:outline-none focus:border-cyber-cyan/40 transition-colors"
                 placeholder="Enter master password"
                 required
-                minLength={8}
+                minLength={12}
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
               />
             </div>
           </div>

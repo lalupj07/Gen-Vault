@@ -78,33 +78,43 @@ fn is_profile_root(path: &Path) -> bool {
 
 fn is_system_path(path: &Path) -> bool {
     let s = path.to_string_lossy().to_lowercase();
-    // Match common Windows system prefixes (canonicalize may use \\?\).
     let stripped = s.trim_start_matches(r"\\?\");
-    let checks = [
-        r"c:\windows",
-        r"c:\program files",
-        r"c:\program files (x86)",
-        r"c:\programdata",
-    ];
-    for prefix in checks {
-        if stripped == prefix || stripped.starts_with(&(String::from(prefix) + r"\")) {
+
+    // Prefer env-known roots (not hardcoded C:).
+    let mut prefixes: Vec<String> = Vec::new();
+    if let Ok(windir) = std::env::var("WINDIR").or_else(|_| std::env::var("SystemRoot")) {
+        prefixes.push(windir.to_lowercase());
+    }
+    if let Ok(pf) = std::env::var("ProgramFiles") {
+        prefixes.push(pf.to_lowercase());
+    }
+    if let Ok(pf86) = std::env::var("ProgramFiles(x86)") {
+        prefixes.push(pf86.to_lowercase());
+    }
+    if let Ok(pd) = std::env::var("ProgramData") {
+        prefixes.push(pd.to_lowercase());
+    }
+    prefixes.extend([
+        r"c:\windows".into(),
+        r"c:\program files".into(),
+        r"c:\program files (x86)".into(),
+        r"c:\programdata".into(),
+    ]);
+
+    for prefix in &prefixes {
+        let p = prefix.trim_end_matches('\\');
+        if stripped == p || stripped.starts_with(&(String::from(p) + r"\")) {
             return true;
         }
     }
-    // Also match if any path component is Windows or Program Files at drive root depth
+
     let comps: Vec<_> = path
         .components()
         .filter_map(|c| c.as_os_str().to_str().map(|s| s.to_lowercase()))
         .collect();
-    if comps.iter().any(|c| c == "windows") && comps.len() >= 2 {
-        // e.g. \\?\C:\Windows\...
-        if comps.iter().any(|c| c == "windows") {
-            let idx = comps.iter().position(|c| c == "windows");
-            if let Some(i) = idx {
-                if i <= 2 {
-                    return true;
-                }
-            }
+    if let Some(i) = comps.iter().position(|c| c == "windows") {
+        if i <= 2 {
+            return true;
         }
     }
     false

@@ -95,13 +95,16 @@ static RESET_IN_PROGRESS: AtomicBool = AtomicBool::new(false);
 
 /// Permanently erase the local vault from the login screen when the user has lost
 /// both the master password and all recovery codes. Requires the exact literal
-/// confirmation phrase. This never decrypts or returns vault data — it only
-/// destroys local encrypted data so the device can start a new account.
+/// confirmation phrase plus a native OS confirm dialog (outside the webview).
+/// This never decrypts or returns vault data — it only destroys local encrypted
+/// data so the device can start a new account.
 #[tauri::command]
 pub fn erase_vault_and_reset(confirmation: String) -> Result<(), String> {
     if confirmation != VAULT_ERASE_CONFIRMATION {
         return Err("Vault erase confirmation did not match.".to_string());
     }
+
+    rate_limit::check_allowed("vault_erase")?;
 
     if RESET_IN_PROGRESS
         .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
@@ -112,10 +115,17 @@ pub fn erase_vault_and_reset(confirmation: String) -> Result<(), String> {
 
     let result = erase_vault_and_reset_inner();
     RESET_IN_PROGRESS.store(false, Ordering::SeqCst);
+    if result.is_err() {
+        let _ = rate_limit::record_failure("vault_erase");
+    }
     result
 }
 
 fn erase_vault_and_reset_inner() -> Result<(), String> {
+    if !confirm_vault_erase_native() {
+        return Err("Vault erase was cancelled.".to_string());
+    }
+
     {
         let mut guard = session().lock();
         if let Some(ref mut key) = *guard {
@@ -126,9 +136,49 @@ fn erase_vault_and_reset_inner() -> Result<(), String> {
 
     // Best-effort: rate-limit file lives inside the vault data dir and is wiped below.
     let _ = rate_limit::reset();
-    store::delete_account().map_err(|e| {
-        format!("The vault could not be fully erased ({e}). Try again or reinstall the app.")
+    store::delete_account().map_err(|_| {
+        "The vault could not be fully erased. Try again or reinstall the app.".to_string()
     })
+}
+
+/// Native confirm outside the webview so IPC alone cannot silently wipe the vault.
+fn confirm_vault_erase_native() -> bool {
+    #[cfg(windows)]
+    {
+        use std::os::windows::ffi::OsStrExt;
+        use windows::core::PCWSTR;
+        use windows::Win32::UI::WindowsAndMessaging::{
+            MessageBoxW, MB_ICONWARNING, MB_YESNO, IDYES,
+        };
+
+        let title: Vec<u16> = std::ffi::OsStr::new("GenVault — Erase vault?")
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
+        let body: Vec<u16> = std::ffi::OsStr::new(
+            "This permanently deletes all local vault data on this device.\n\n\
+             GenXis cannot restore a zero-knowledge vault.\n\n\
+             Continue?",
+        )
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
+
+        let result = unsafe {
+            MessageBoxW(
+                None,
+                PCWSTR(body.as_ptr()),
+                PCWSTR(title.as_ptr()),
+                MB_YESNO | MB_ICONWARNING,
+            )
+        };
+        result == IDYES
+    }
+    #[cfg(not(windows))]
+    {
+        // Non-Windows: phrase confirmation alone (platform has no MessageBox path here).
+        true
+    }
 }
 
 /// Accepts both camelCase (Tauri default IPC) and snake_case keys.
@@ -259,15 +309,23 @@ pub fn log_in(_username: String) -> Result<User, String> {
 /// One-time migration: legacy keyring-only accounts enroll a master password.
 #[tauri::command]
 pub fn setup_master_password_from_legacy(password: String) -> Result<User, String> {
+    rate_limit::check_allowed("unlock")?;
     validate_master_password(&password)?;
     let info = store::unlock_info().map_err(|e| e.to_string())?;
     if !info.legacy {
         return Err("Account is not in legacy mode. Use unlock_with_password.".to_string());
     }
-    let key = store::authenticate(None).map_err(|e| e.to_string())?;
-    store::enroll_secret("password", &password, &key).map_err(|e| e.to_string())?;
-    rate_limit::record_success("unlock").map_err(|e| e.to_string())?;
-    finalize_unlock(key)
+    match store::authenticate(None) {
+        Ok(key) => {
+            store::enroll_secret("password", &password, &key).map_err(|e| e.to_string())?;
+            rate_limit::record_success("unlock").map_err(|e| e.to_string())?;
+            finalize_unlock(key)
+        }
+        Err(e) => {
+            let _ = rate_limit::record_failure("unlock");
+            Err(e.to_string())
+        }
+    }
 }
 
 /// Report how the local vault can be unlocked on this device.

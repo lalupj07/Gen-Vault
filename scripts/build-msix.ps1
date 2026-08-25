@@ -17,9 +17,10 @@ $MsixRoot = Join-Path $ProjectRoot "store\msix"
 $StageDir = Join-Path $MsixRoot "stage"
 $AssetsDir = Join-Path $MsixRoot "Assets"
 $Manifest = Join-Path $MsixRoot "Package.appxmanifest"
-$Version = "1.5.0.0"
-$OutDir = Join-Path $ProjectRoot "dist\release\v1.5.0"
+$Version = "2.1.0.0"
+$OutDir = Join-Path $ProjectRoot "dist\release\v2.1.0"
 $MsixName = "GenVault_${Version}_x64.msix"
+$AppxName = "GenVault_${Version}_x64.appx"
 
 Write-Host "GenVault MSIX Store Package Build" -ForegroundColor Cyan
 Write-Host "====================================" -ForegroundColor Cyan
@@ -152,9 +153,12 @@ if ($Sign -and -not $winapp) {
 }
 
 $MsixMb = [math]::Round((Get-Item $MsixPath).Length / 1MB, 2)
+$AppxPath = Join-Path $OutDir $AppxName
+Copy-Item -Force $MsixPath $AppxPath
 Write-Host ""
-Write-Host "MSIX build complete" -ForegroundColor Green
-Write-Host "  Output: $MsixPath ($MsixMb MB)" -ForegroundColor Green
+Write-Host "MSIX/APPX build complete" -ForegroundColor Green
+Write-Host "  MSIX: $MsixPath ($MsixMb MB)" -ForegroundColor Green
+Write-Host "  APPX: $AppxPath (same package; APPX alias for Store tooling)" -ForegroundColor Green
 Write-Host ""
 Write-Host "Store submission checklist:" -ForegroundColor Cyan
 Write-Host "  1. Update store/msix/Package.appxmanifest Identity (Name + Publisher) from Partner Center"

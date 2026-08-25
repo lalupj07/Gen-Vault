@@ -26,6 +26,16 @@ pub fn validate_lock_file(path: &Path, genvault_data_dir: Option<&Path>) -> Resu
     if !path.exists() {
         return Err(PolicyError::NotFound);
     }
+    if path
+        .symlink_metadata()
+        .map(|m| m.file_type().is_symlink())
+        .unwrap_or(false)
+        || is_reparse_point(path)
+    {
+        return Err(PolicyError::Other(
+            "Symlinks and junctions cannot be locked".into(),
+        ));
+    }
     if !path.is_file() {
         return Err(PolicyError::NotAFile);
     }
@@ -53,17 +63,49 @@ pub fn validate_lock_file(path: &Path, genvault_data_dir: Option<&Path>) -> Resu
     Ok(())
 }
 
+fn is_reparse_point(path: &Path) -> bool {
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
+        std::fs::symlink_metadata(path)
+            .map(|m| (m.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT) != 0)
+            .unwrap_or(false)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = path;
+        false
+    }
+}
+
 fn is_system_path(path: &Path) -> bool {
     let s = path.to_string_lossy().to_lowercase();
     let stripped = s.trim_start_matches(r"\\?\");
-    let checks = [
-        r"c:\windows",
-        r"c:\program files",
-        r"c:\program files (x86)",
-        r"c:\programdata",
-    ];
-    for prefix in checks {
-        if stripped == prefix || stripped.starts_with(&(String::from(prefix) + r"\")) {
+
+    let mut prefixes: Vec<String> = Vec::new();
+    if let Ok(windir) = std::env::var("WINDIR").or_else(|_| std::env::var("SystemRoot")) {
+        prefixes.push(windir.to_lowercase());
+    }
+    if let Ok(pf) = std::env::var("ProgramFiles") {
+        prefixes.push(pf.to_lowercase());
+    }
+    if let Ok(pf86) = std::env::var("ProgramFiles(x86)") {
+        prefixes.push(pf86.to_lowercase());
+    }
+    if let Ok(pd) = std::env::var("ProgramData") {
+        prefixes.push(pd.to_lowercase());
+    }
+    prefixes.extend([
+        r"c:\windows".into(),
+        r"c:\program files".into(),
+        r"c:\program files (x86)".into(),
+        r"c:\programdata".into(),
+    ]);
+
+    for prefix in &prefixes {
+        let p = prefix.trim_end_matches('\\');
+        if stripped == p || stripped.starts_with(&(String::from(p) + r"\")) {
             return true;
         }
     }

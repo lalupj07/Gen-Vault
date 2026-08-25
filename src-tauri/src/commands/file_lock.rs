@@ -186,8 +186,16 @@ pub fn file_lock_settings_set(auto_lock_mins: u32) -> Result<FileLockSettings, S
     Ok(settings)
 }
 
+/// Wipe orphan staging (IPC). Requires vault unlock — see folder_lock_crash_recover.
 #[tauri::command]
 pub fn file_lock_crash_recover() -> Result<(), String> {
+    require_windows()?;
+    let _key = get_key()?;
+    wipe_file_lock_orphans_on_startup()
+}
+
+/// Best-effort orphan wipe at process start (no unlock session exists yet).
+pub fn wipe_file_lock_orphans_on_startup() -> Result<(), String> {
     require_windows()?;
     let Ok(dir) = data_dir() else {
         return Ok(());
