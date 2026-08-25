@@ -6,6 +6,7 @@ pub mod commands;
 pub mod crypto;
 mod entry_history;
 mod fido;
+mod guest;
 pub mod folder_lock;
 pub mod file_lock;
 pub mod media_vault;
