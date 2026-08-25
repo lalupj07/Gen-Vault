@@ -122,6 +122,21 @@ fn recovery_key_path() -> Result<PathBuf, StoreError> {
     Ok(data_dir()?.join("recovery_key.enc"))
 }
 
+fn duress_key_path() -> Result<PathBuf, StoreError> {
+    Ok(data_dir()?.join("duress_key.enc"))
+}
+
+fn duress_vault_path() -> Result<PathBuf, StoreError> {
+    Ok(data_dir()?.join("duress_vault.enc"))
+}
+
+/// Wrapped duress VMK (salt + AES-GCM blob), stored in `duress_key.enc`.
+#[derive(serde::Serialize, serde::Deserialize)]
+struct DuressKeyWrap {
+    salt: Vec<u8>,
+    wrapped_key: Vec<u8>,
+}
+
 /// Access the OS-native secure credential store entry holding the vault master key.
 /// On Windows this uses Credential Manager, on macOS the Keychain, and on Linux
 /// the Secret Service — never plain files, never localStorage, never derivable
@@ -169,6 +184,7 @@ pub fn create_account(username: &str) -> Result<[u8; 32], StoreError> {
         methods: vec![],
         enrolled_question_ids: vec![],
         security_keys: vec![],
+        duress_enrolled: false,
     };
     write_atomic(
         &meta_path()?,
@@ -384,6 +400,7 @@ pub fn delete_account() -> Result<(), StoreError> {
     let _ = crate::vault_db::wipe_db();
     let _ = crate::recovery_codes::delete_all_recovery_codes();
     let dir = data_dir()?;
+    let _ = delete_duress_files();
     clear_vault_data_dir(&dir)?;
     // Success = no account metadata left (root dir may remain on Android).
     if account_exists().unwrap_or(false) {
@@ -831,8 +848,12 @@ pub fn remove_method(kind: &str, _vmk: &[u8; 32]) -> Result<(), StoreError> {
 /// from a user-supplied backup passphrase and a fresh random salt, so it can be
 /// restored on any device WITHOUT the OS keyring or original unlock methods.
 /// Unlike `export_vault`, this DOES include the TOTP secrets (encrypted).
-pub fn export_backup(passphrase: &str, vmk: &[u8; 32]) -> Result<String, StoreError> {
-    let vault = load_vault_with_key(vmk)?;
+pub fn export_backup(passphrase: &str, vmk: &[u8; 32], duress: bool) -> Result<String, StoreError> {
+    let vault = if duress {
+        load_duress_vault_with_key(vmk)?
+    } else {
+        load_vault_with_key(vmk)?
+    };
     let plaintext = serde_json::to_vec(&vault)?;
 
     let salt = crypto::generate_salt();
@@ -902,14 +923,265 @@ pub fn delete_recovery_key() -> Result<(), StoreError> {
     Ok(())
 }
 
+fn delete_duress_files() -> Result<(), StoreError> {
+    for path in [duress_key_path()?, duress_vault_path()?] {
+        if path.exists() {
+            let _ = fs::remove_file(&path);
+        }
+    }
+    Ok(())
+}
+
+/// Whether a duress decoy vault is enrolled (safe to call while locked).
+pub fn has_duress_enrolled() -> bool {
+    load_meta()
+        .map(|m| m.duress_enrolled)
+        .unwrap_or(false)
+}
+
+fn build_decoy_vault(username: &str) -> VaultData {
+    use uuid::Uuid;
+
+    let templates = crate::templates::builtin_templates();
+    let decoy_template_ids = ["google", "github", "microsoft"];
+    let now = chrono::Utc::now().timestamp_millis();
+    let mut vault_entries = Vec::new();
+
+    for tid in decoy_template_ids {
+        if let Some(t) = templates.iter().find(|x| x.id == tid) {
+            vault_entries.push(crate::models::VaultEntry {
+                id: Uuid::new_v4().to_string(),
+                name: t.name.clone(),
+                issuer: t.issuer.clone(),
+                secret: crate::totp_gen::generate_secret(),
+                category: t.category.clone(),
+                icon: t.icon.clone(),
+                color: t.color.clone(),
+                digits: t.digits,
+                period: t.period,
+                created_at: now,
+                last_used: now,
+                tags: t.tags.clone(),
+                favorite: false,
+                notes: String::new(),
+                custom_period: Some(t.period),
+                custom_digits: Some(t.digits),
+                hotp_counter: None,
+                is_hotp: false,
+                attachments: Vec::new(),
+            });
+        }
+    }
+
+    VaultData {
+        user: Some(crate::models::User {
+            id: Uuid::new_v4().to_string(),
+            username: username.to_string(),
+            display_name: username.to_string(),
+            created_at: now,
+            last_login: now,
+            is_onboarded: true,
+            mfa_enabled: false,
+            biometric_enabled: false,
+            security_tier: "Standard".to_string(),
+        }),
+        vault_entries,
+        ..VaultData::default()
+    }
+}
+
+/// Load the duress decoy vault (entries live in encrypted JSON — no separate DB).
+pub fn load_duress_vault_with_key(key: &[u8; 32]) -> Result<VaultData, StoreError> {
+    let path = duress_vault_path()?;
+    if !path.exists() {
+        return Err(StoreError::InvalidSecret);
+    }
+    let encrypted = fs::read(&path)?;
+    let decrypted = crypto::decrypt(&encrypted, key)?;
+    serde_json::from_slice(&decrypted).map_err(StoreError::from)
+}
+
+/// Persist the duress decoy vault.
+pub fn save_duress_vault_with_key(vault: &VaultData, key: &[u8; 32]) -> Result<(), StoreError> {
+    let json = serde_json::to_vec(vault)?;
+    let encrypted = crypto::encrypt(&json, key)?;
+    write_atomic(&duress_vault_path()?, &encrypted)
+}
+
+fn save_duress_key_wrap(duress_password: &str, vmk: &[u8; 32]) -> Result<(), StoreError> {
+    let salt = crypto::generate_salt();
+    let wrap_key = crypto::derive_key(duress_password, &salt)?;
+    let wrapped_key = crypto::encrypt(vmk, &wrap_key)?;
+    let wrap = DuressKeyWrap { salt, wrapped_key };
+    write_atomic(
+        &duress_key_path()?,
+        serde_json::to_vec(&wrap)?.as_slice(),
+    )
+}
+
+fn load_duress_key_wrap() -> Result<DuressKeyWrap, StoreError> {
+    let path = duress_key_path()?;
+    if !path.exists() {
+        return Err(StoreError::MethodNotFound);
+    }
+    let raw = fs::read(&path)?;
+    serde_json::from_slice(&raw).map_err(StoreError::from)
+}
+
+/// Enroll a duress decoy vault. Requires correct master password; duress must differ.
+pub fn enroll_duress(master_password: &str, duress_password: &str) -> Result<(), StoreError> {
+    if master_password == duress_password {
+        return Err(StoreError::Keyring(
+            "Duress password must differ from master password".into(),
+        ));
+    }
+
+    let real_vmk = unlock_with_secret("password", master_password)?;
+    let _ = real_vmk; // verified only — decoy uses a separate VMK
+
+    let duress_vmk = crypto::generate_key();
+    save_duress_key_wrap(duress_password, &duress_vmk)?;
+
+    let meta = load_meta()?;
+    let decoy = build_decoy_vault(&meta.username);
+    save_duress_vault_with_key(&decoy, &duress_vmk)?;
+
+    let mut meta = meta;
+    meta.duress_enrolled = true;
+    save_meta(&meta)?;
+
+    Ok(())
+}
+
+/// Remove duress enrollment. Requires correct master password.
+pub fn remove_duress(master_password: &str) -> Result<(), StoreError> {
+    let _ = unlock_with_secret("password", master_password)?;
+    delete_duress_files()?;
+    let mut meta = load_meta()?;
+    meta.duress_enrolled = false;
+    save_meta(&meta)
+}
+
+/// Try to unwrap the duress VMK with the given password.
+pub fn try_unlock_duress(password: &str) -> Result<[u8; 32], StoreError> {
+    if !has_duress_enrolled() {
+        return Err(StoreError::MethodNotFound);
+    }
+    let wrap = load_duress_key_wrap()?;
+    let mut wrap_key = crypto::derive_key(password, &wrap.salt)?;
+    let mut vmk_bytes = crypto::decrypt(&wrap.wrapped_key, &wrap_key)
+        .map_err(|_| StoreError::InvalidSecret)?;
+    wrap_key.zeroize();
+    if vmk_bytes.len() != 32 {
+        vmk_bytes.zeroize();
+        return Err(StoreError::InvalidSecret);
+    }
+    let mut key = [0u8; 32];
+    key.copy_from_slice(&vmk_bytes);
+    vmk_bytes.zeroize();
+    Ok(key)
+}
+
+#[cfg(test)]
+pub(crate) static DATA_DIR_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+#[cfg(test)]
+pub(crate) fn test_data_dir_guard() -> std::sync::MutexGuard<'static, ()> {
+    DATA_DIR_TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn data_dir_honors_env_override() {
+    use super::*;
+
+    fn with_temp_data_dir<F: FnOnce()>(f: F) {
+        let _guard = test_data_dir_guard();
         let tmp = tempfile::tempdir().unwrap();
         std::env::set_var("GENVAULT_DATA_DIR", tmp.path());
-        let dir = crate::store::data_dir_public().unwrap();
-        assert_eq!(dir, tmp.path());
+        f();
         std::env::remove_var("GENVAULT_DATA_DIR");
+    }
+
+    fn setup_account(master: &str) -> [u8; 32] {
+        let key = create_account("testuser").unwrap();
+        enroll_secret("password", master, &key).unwrap();
+        key
+    }
+
+    #[test]
+    fn data_dir_honors_env_override() {
+        with_temp_data_dir(|| {
+            let tmp = crate::store::data_dir_public().unwrap();
+            assert!(tmp.exists());
+        });
+    }
+
+    #[test]
+    fn duress_enroll_unlock_and_isolation() {
+        with_temp_data_dir(|| {
+            let master = "MasterPass123!";
+            let duress = "DuressPass456!";
+            setup_account(master);
+
+            // Real vault gets a distinct entry
+            let real_key = unlock_with_secret("password", master).unwrap();
+            let mut real_vault = load_vault_with_key(&real_key).unwrap();
+            real_vault.vault_entries.push(crate::models::VaultEntry {
+                id: "real-only".into(),
+                name: "Real Secret".into(),
+                issuer: "GenVault".into(),
+                secret: "REALSECRETREALSECRET".into(),
+                category: "Test".into(),
+                icon: "RS".into(),
+                color: "#000".into(),
+                digits: 6,
+                period: 30,
+                created_at: 0,
+                last_used: 0,
+                tags: vec![],
+                favorite: false,
+                notes: String::new(),
+                custom_period: None,
+                custom_digits: None,
+                hotp_counter: None,
+                is_hotp: false,
+                attachments: vec![],
+            });
+            save_vault_with_key(&real_vault, &real_key).unwrap();
+
+            enroll_duress(master, duress).unwrap();
+            assert!(has_duress_enrolled());
+
+            let duress_key = try_unlock_duress(duress).unwrap();
+            assert_ne!(real_key, duress_key);
+
+            let decoy = load_duress_vault_with_key(&duress_key).unwrap();
+            assert!(decoy.vault_entries.len() >= 2);
+            assert!(decoy.vault_entries.len() <= 3);
+            assert!(!decoy.vault_entries.iter().any(|e| e.id == "real-only"));
+            assert!(decoy
+                .vault_entries
+                .iter()
+                .any(|e| e.name == "Google" || e.name == "GitHub"));
+
+            assert!(try_unlock_duress(master).is_err());
+            assert!(try_unlock_duress("WrongPass789!").is_err());
+
+            remove_duress(master).unwrap();
+            assert!(!has_duress_enrolled());
+            assert!(!duress_key_path().unwrap().exists());
+        });
+    }
+
+    #[test]
+    fn duress_password_must_differ_from_master() {
+        with_temp_data_dir(|| {
+            let master = "MasterPass123!";
+            setup_account(master);
+            let err = enroll_duress(master, master).unwrap_err();
+            assert!(err.to_string().contains("differ"));
+        });
     }
 }

@@ -5,7 +5,7 @@ use crate::rate_limit;
 use crate::recovery_codes;
 use crate::security_questions;
 use crate::store;
-use super::{get_key, now_ts, session, validate_master_password, with_vault};
+use super::{get_key, load_active_vault, now_ts, session, validate_master_password, with_vault};
 // ===== Security Questions =====
 
 #[tauri::command]
@@ -32,7 +32,7 @@ pub fn enroll_security_answers(_answers: Vec<(String, String)>) -> Result<(), St
 #[tauri::command]
 pub fn verify_security_answers(answers: Vec<(String, String)>) -> Result<bool, String> {
     let key = get_key()?;
-    let vault = store::load_vault_with_key(&key).map_err(|e| e.to_string())?;
+    let vault = load_active_vault(&key)?;
 
     if vault.security_answers.is_empty() {
         return Err("No security questions enrolled".to_string());

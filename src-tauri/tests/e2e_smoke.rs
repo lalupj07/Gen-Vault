@@ -182,7 +182,7 @@ fn e2e_encrypted_backup_roundtrip() {
         vault.vault_entries.push(sample_entry("BackupTest"));
 
         store::save_vault_with_key(&vault, &vmk).expect("save");
-        let backup_json = store::export_backup("TestPass123!@#", &vmk).expect("export");
+        let backup_json = store::export_backup("TestPass123!@#", &vmk, false).expect("export");
         let restored = store::decode_backup("TestPass123!@#", &backup_json).expect("decode");
 
         assert_eq!(restored.vault_entries.len(), 1);

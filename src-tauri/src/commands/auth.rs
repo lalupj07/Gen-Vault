@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use uuid::Uuid;
 use zeroize::Zeroize;
 
-use super::{entry_public, get_key, now_ts, session, validate_master_password, with_vault};
+use super::{entry_public, get_key, is_duress_session, load_active_vault, now_ts, session, set_duress_session, validate_master_password, with_vault};
 use crate::commands::privacy::ensure_export_allowed;
 use crate::hello;
 use crate::models::*;
@@ -50,7 +50,7 @@ pub(crate) fn finalize_unlock(key: [u8; 32]) -> Result<User, String> {
         Ok(())
     })?;
 
-    let vault = store::load_vault_with_key(&key).map_err(|e| e.to_string())?;
+    let vault = load_active_vault(&key)?;
     vault.user.ok_or_else(|| "User data corrupted".to_string())
 }
 #[tauri::command]
@@ -132,13 +132,7 @@ fn erase_vault_and_reset_inner() -> Result<(), String> {
         return Err("Vault erase was cancelled.".to_string());
     }
 
-    {
-        let mut guard = session().lock();
-        if let Some(ref mut key) = *guard {
-            key.zeroize();
-        }
-        *guard = None;
-    }
+    super::clear_session_state();
 
     // Best-effort: rate-limit file lives inside the vault data dir and is wiped below.
     let _ = rate_limit::reset();
@@ -293,7 +287,7 @@ fn sign_up_inner(
     }
 
     let key = get_key()?;
-    let vault = store::load_vault_with_key(&key).map_err(|e| e.to_string())?;
+    let vault = load_active_vault(&key)?;
     vault.user.ok_or_else(|| "User data corrupted".to_string())
 }
 
@@ -340,14 +334,33 @@ pub fn get_unlock_info() -> Result<UnlockInfo, String> {
     store::unlock_info().map_err(|e| e.to_string())
 }
 
-/// Unlock using the master password.
+/// Unlock using the master password (real vault first, then duress decoy if enrolled).
 #[tauri::command]
 pub fn unlock_with_password(password: String) -> Result<User, String> {
     rate_limit::check_allowed("unlock")?;
     match store::unlock_with_secret("password", &password) {
         Ok(key) => {
             rate_limit::record_success("unlock").map_err(|e| e.to_string())?;
+            set_duress_session(false);
             finalize_unlock(key)
+        }
+        Err(store::StoreError::InvalidSecret) | Err(store::StoreError::MethodNotFound) => {
+            if store::has_duress_enrolled() {
+                match store::try_unlock_duress(&password) {
+                    Ok(key) => {
+                        rate_limit::record_success("unlock").map_err(|e| e.to_string())?;
+                        set_duress_session(true);
+                        finalize_unlock(key)
+                    }
+                    Err(_) => {
+                        let _ = rate_limit::record_failure("unlock");
+                        Err("Incorrect password or PIN".to_string())
+                    }
+                }
+            } else {
+                let _ = rate_limit::record_failure("unlock");
+                Err("Incorrect password or PIN".to_string())
+            }
         }
         Err(e) => {
             let _ = rate_limit::record_failure("unlock");
@@ -380,6 +393,7 @@ pub fn unlock_with_hello(window: tauri::WebviewWindow, password: String) -> Resu
     match store::unlock_with_secret("password", &password) {
         Ok(key) => {
             rate_limit::record_success("unlock").map_err(|e| e.to_string())?;
+            set_duress_session(false);
             finalize_unlock(key)
         }
         Err(e) => {
@@ -1027,7 +1041,7 @@ pub fn export_backup(passphrase: String) -> Result<String, String> {
     ensure_export_allowed()?;
     validate_master_password(&passphrase)?;
     let key = get_key()?;
-    store::export_backup(&passphrase, &key).map_err(|e| e.to_string())
+    store::export_backup(&passphrase, &key, is_duress_session()).map_err(|e| e.to_string())
 }
 
 /// Restore a vault from an encrypted backup blob, re-encrypting it under the
@@ -1042,11 +1056,7 @@ pub fn restore_backup(passphrase: String, backup_json: String) -> Result<(), Str
 
 #[tauri::command]
 pub fn log_out() -> Result<(), String> {
-    let mut guard = session().lock();
-    if let Some(ref mut key) = *guard {
-        key.zeroize();
-    }
-    *guard = None;
+    super::clear_session_state();
     Ok(())
 }
 
@@ -1078,13 +1088,13 @@ pub fn update_user(display_name: Option<String>, username: Option<String>) -> Re
     }
 
     let key = get_key()?;
-    let vault = store::load_vault_with_key(&key).map_err(|e| e.to_string())?;
+    let vault = load_active_vault(&key)?;
     vault.user.ok_or_else(|| "User data missing".to_string())
 }
 
 #[tauri::command]
 pub fn get_user() -> Result<Option<User>, String> {
     let key = get_key()?;
-    let vault = store::load_vault_with_key(&key).map_err(|e| e.to_string())?;
+    let vault = load_active_vault(&key)?;
     Ok(vault.user)
 }

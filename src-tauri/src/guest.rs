@@ -449,17 +449,9 @@ mod tests {
     use super::*;
     use crate::crypto;
     use crate::file_lock::service::FileLockService;
-    use std::sync::{Mutex, OnceLock};
-
-    fn test_lock() -> &'static Mutex<()> {
-        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-        LOCK.get_or_init(|| Mutex::new(()))
-    }
 
     fn with_data_dir<F: FnOnce() -> R, R>(dir: &Path, f: F) -> R {
-        let _guard = test_lock()
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _guard = crate::store::test_data_dir_guard();
         std::env::set_var("GENVAULT_DATA_DIR", dir);
         let _ = rate_limit::reset();
         let out = f();

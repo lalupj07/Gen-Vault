@@ -89,13 +89,14 @@ pub fn export_backup_to_drive(
     passphrase: &str,
     drive_letter: &str,
     vmk: &[u8; 32],
+    duress: bool,
 ) -> Result<String, StoreError> {
     let letter = drive_letter.trim().trim_end_matches(':').to_uppercase();
     if letter.len() != 1 || !letter.chars().next().is_some_and(|c| c.is_ascii_alphabetic()) {
         return Err(StoreError::InvalidSecret);
     }
 
-    let backup_json = store::export_backup(passphrase, vmk)?;
+    let backup_json = store::export_backup(passphrase, vmk, duress)?;
     let min_free = backup_json.len() as u64 + 1024;
     let available = list_removable_drives()
         .into_iter()

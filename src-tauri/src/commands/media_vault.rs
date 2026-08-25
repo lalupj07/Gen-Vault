@@ -6,7 +6,7 @@ use base64::{engine::general_purpose::STANDARD as B64, Engine};
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroize;
 
-use crate::commands::get_key;
+use crate::commands::{ensure_lock_suite_allowed, get_key};
 use crate::media_vault::service::{
     BatchImportResult, MediaItemPublic, MediaVaultService, ServiceError,
 };
@@ -116,6 +116,7 @@ pub fn media_vault_import(
     confirm_large: bool,
 ) -> Result<MediaItemPublic, String> {
     require_windows()?;
+    ensure_lock_suite_allowed()?;
     let key = get_key()?;
     service()?
         .import(
@@ -134,6 +135,7 @@ pub fn media_vault_import_batch(
     confirm_large: bool,
 ) -> Result<BatchImportResult, String> {
     require_windows()?;
+    ensure_lock_suite_allowed()?;
     let key = get_key()?;
     let paths: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
     service()?
@@ -144,6 +146,7 @@ pub fn media_vault_import_batch(
 #[tauri::command]
 pub fn media_vault_view(id: String) -> Result<String, String> {
     require_windows()?;
+    ensure_lock_suite_allowed()?;
     let key = get_key()?;
     let staging = service()?.view(&id, &key).map_err(map_err)?;
     #[cfg(windows)]
@@ -154,6 +157,7 @@ pub fn media_vault_view(id: String) -> Result<String, String> {
 #[tauri::command]
 pub fn media_vault_relock(id: String) -> Result<(), String> {
     require_windows()?;
+    ensure_lock_suite_allowed()?;
     let _key = get_key()?;
     service()?.relock(&id).map_err(map_err)
 }
@@ -161,6 +165,7 @@ pub fn media_vault_relock(id: String) -> Result<(), String> {
 #[tauri::command]
 pub fn media_vault_relock_all() -> Result<(), String> {
     require_windows()?;
+    ensure_lock_suite_allowed()?;
     let _key = get_key()?;
     service()?.relock_all_viewing().map_err(map_err)
 }
@@ -168,6 +173,7 @@ pub fn media_vault_relock_all() -> Result<(), String> {
 #[tauri::command]
 pub fn media_vault_delete(id: String) -> Result<(), String> {
     require_windows()?;
+    ensure_lock_suite_allowed()?;
     let key = get_key()?;
     service()?.delete_item(&id, &key).map_err(map_err)
 }
@@ -175,6 +181,7 @@ pub fn media_vault_delete(id: String) -> Result<(), String> {
 #[tauri::command]
 pub fn media_vault_export(id: String, dest_path: String, password: String) -> Result<(), String> {
     require_windows()?;
+    ensure_lock_suite_allowed()?;
     verify_master_password(&password)?;
     let key = get_key()?;
     service()?
@@ -193,6 +200,7 @@ pub fn media_vault_thumb(id: String) -> Result<String, String> {
 #[tauri::command]
 pub fn media_vault_set_favorite(id: String, favorite: bool) -> Result<(), String> {
     require_windows()?;
+    ensure_lock_suite_allowed()?;
     let _key = get_key()?;
     service()?.set_favorite(&id, favorite).map_err(map_err)
 }
@@ -200,6 +208,7 @@ pub fn media_vault_set_favorite(id: String, favorite: bool) -> Result<(), String
 #[tauri::command]
 pub fn media_vault_set_title(id: String, title: String) -> Result<(), String> {
     require_windows()?;
+    ensure_lock_suite_allowed()?;
     let _key = get_key()?;
     service()?.set_title(&id, &title).map_err(map_err)
 }
@@ -207,6 +216,7 @@ pub fn media_vault_set_title(id: String, title: String) -> Result<(), String> {
 #[tauri::command]
 pub fn media_vault_set_album(id: String, album: String) -> Result<(), String> {
     require_windows()?;
+    ensure_lock_suite_allowed()?;
     let _key = get_key()?;
     service()?.set_album(&id, &album).map_err(map_err)
 }
@@ -228,6 +238,7 @@ pub fn media_vault_settings_get() -> Result<MediaVaultSettings, String> {
 #[tauri::command]
 pub fn media_vault_settings_set(auto_lock_mins: u32) -> Result<MediaVaultSettings, String> {
     require_windows()?;
+    ensure_lock_suite_allowed()?;
     let _key = get_key()?;
     let settings = MediaVaultSettings { auto_lock_mins };
     save_settings(&settings)?;
@@ -238,6 +249,7 @@ pub fn media_vault_settings_set(auto_lock_mins: u32) -> Result<MediaVaultSetting
 #[tauri::command]
 pub fn media_vault_crash_recover() -> Result<(), String> {
     require_windows()?;
+    ensure_lock_suite_allowed()?;
     let _key = get_key()?;
     wipe_media_vault_orphans_on_startup()
 }

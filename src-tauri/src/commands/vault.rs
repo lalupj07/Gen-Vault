@@ -10,8 +10,8 @@ use crate::store;
 use crate::totp_gen;
 use crate::vault_db;
 use super::{
-    entry_public, get_key, hash_emergency_code, now_ts, session, verify_emergency_code_hash,
-    with_vault,
+    entry_public, get_key, hash_emergency_code, is_duress_session, load_active_vault, now_ts,
+    save_active_vault, session, verify_emergency_code_hash, with_vault,
 };
 use crate::commands::privacy::ensure_export_allowed;
 // ===== Vault Entry Commands =====
@@ -224,7 +224,7 @@ pub fn reveal_entry_secret(entry_id: String, password: String) -> Result<String,
     if !ok {
         return Err("Incorrect master password".to_string());
     }
-    let vault = store::load_vault_with_key(&key).map_err(|e| e.to_string())?;
+    let vault = load_active_vault(&key).map_err(|e| e.to_string())?;
     let entry = vault
         .vault_entries
         .iter()
@@ -243,7 +243,7 @@ pub fn reveal_entry_notes(entry_id: String, password: String) -> Result<String, 
     if !ok {
         return Err("Incorrect master password".to_string());
     }
-    let vault = store::load_vault_with_key(&key).map_err(|e| e.to_string())?;
+    let vault = load_active_vault(&key).map_err(|e| e.to_string())?;
     let entry = vault
         .vault_entries
         .iter()
@@ -257,7 +257,7 @@ pub fn reveal_entry_notes(entry_id: String, password: String) -> Result<String, 
 #[tauri::command]
 pub fn generate_otp(entry_id: String) -> Result<OtpCode, String> {
     let key = get_key()?;
-    let mut vault = store::load_vault_with_key(&key).map_err(|e| e.to_string())?;
+    let mut vault = load_active_vault(&key).map_err(|e| e.to_string())?;
     let ctx = totp_gen::OtpContext {
         timezone_offset: vault.settings.timezone_offset,
         clock_drift: vault.settings.clock_drift_seconds,
@@ -282,7 +282,7 @@ pub fn generate_otp(entry_id: String) -> Result<OtpCode, String> {
     )?;
 
     vault.vault_entries[idx].last_used = now_ts();
-    store::save_vault_with_key(&vault, &key).map_err(|e| e.to_string())?;
+    save_active_vault(&vault, &key).map_err(|e| e.to_string())?;
     Ok(code)
 }
 
@@ -291,7 +291,7 @@ pub fn generate_otp(entry_id: String) -> Result<OtpCode, String> {
 #[tauri::command]
 pub fn verify_otp(entry_id: String, code: String) -> Result<bool, String> {
     let key = get_key()?;
-    let vault = store::load_vault_with_key(&key).map_err(|e| e.to_string())?;
+    let vault = load_active_vault(&key).map_err(|e| e.to_string())?;
     let ctx = totp_gen::OtpContext {
         timezone_offset: vault.settings.timezone_offset,
         clock_drift: vault.settings.clock_drift_seconds,
@@ -330,7 +330,7 @@ pub fn get_provisioning_uri(entry_id: String, password: String) -> Result<String
     if !ok {
         return Err("Incorrect master password".to_string());
     }
-    let vault = store::load_vault_with_key(&key).map_err(|e| e.to_string())?;
+    let vault = load_active_vault(&key).map_err(|e| e.to_string())?;
 
     let entry = vault
         .vault_entries
@@ -353,7 +353,7 @@ pub fn get_provisioning_uri(entry_id: String, password: String) -> Result<String
 #[tauri::command]
 pub fn get_devices() -> Result<Vec<DeviceEntry>, String> {
     let key = get_key()?;
-    let vault = store::load_vault_with_key(&key).map_err(|e| e.to_string())?;
+    let vault = load_active_vault(&key).map_err(|e| e.to_string())?;
     Ok(vault.devices)
 }
 
@@ -413,7 +413,7 @@ pub fn update_device_trust(device_id: String, trust_level: f64) -> Result<(), St
 #[tauri::command]
 pub fn get_sessions() -> Result<Vec<Session>, String> {
     let key = get_key()?;
-    let vault = store::load_vault_with_key(&key).map_err(|e| e.to_string())?;
+    let vault = load_active_vault(&key).map_err(|e| e.to_string())?;
     Ok(vault.sessions)
 }
 
@@ -422,7 +422,7 @@ pub fn get_sessions() -> Result<Vec<Session>, String> {
 #[tauri::command]
 pub fn get_security_events() -> Result<Vec<SecurityEvent>, String> {
     let key = get_key()?;
-    let vault = store::load_vault_with_key(&key).map_err(|e| e.to_string())?;
+    let vault = load_active_vault(&key).map_err(|e| e.to_string())?;
     Ok(vault.security_events)
 }
 
@@ -445,7 +445,7 @@ pub fn add_security_event(event_type: String, message: String, severity: String)
 #[tauri::command]
 pub fn get_settings() -> Result<AppSettings, String> {
     let key = get_key()?;
-    let vault = store::load_vault_with_key(&key).map_err(|e| e.to_string())?;
+    let vault = load_active_vault(&key).map_err(|e| e.to_string())?;
     Ok(vault.settings)
 }
 
@@ -529,7 +529,7 @@ pub fn delete_account_cmd(password: String) -> Result<(), String> {
 #[tauri::command]
 pub fn get_security_score() -> Result<u32, String> {
     let key = get_key()?;
-    let vault = store::load_vault_with_key(&key).map_err(|e| e.to_string())?;
+    let vault = load_active_vault(&key).map_err(|e| e.to_string())?;
 
     let mut score: u32 = 40; // Base score
 
@@ -555,7 +555,7 @@ pub fn get_security_score() -> Result<u32, String> {
 pub fn export_vault() -> Result<String, String> {
     ensure_export_allowed()?;
     let key = get_key()?;
-    let vault = store::load_vault_with_key(&key).map_err(|e| e.to_string())?;
+    let vault = load_active_vault(&key).map_err(|e| e.to_string())?;
 
     // Export entries (without secrets for security)
     let export: Vec<serde_json::Value> = vault
@@ -972,7 +972,7 @@ pub fn get_auto_lock_settings() -> Result<(bool, u32), String> {
 pub fn export_vault_json() -> Result<String, String> {
     ensure_export_allowed()?;
     let key = get_key()?;
-    let vault = store::load_vault_with_key(&key).map_err(|e| e.to_string())?;
+    let vault = load_active_vault(&key).map_err(|e| e.to_string())?;
     let public: Vec<VaultEntryPublic> = vault.vault_entries.iter().map(entry_public).collect();
     serde_json::to_string_pretty(&public).map_err(|e| e.to_string())
 }
@@ -987,7 +987,7 @@ pub fn export_vault_secrets_json(password: String) -> Result<String, String> {
     if !ok {
         return Err("Incorrect master password".to_string());
     }
-    let vault = store::load_vault_with_key(&key).map_err(|e| e.to_string())?;
+    let vault = load_active_vault(&key).map_err(|e| e.to_string())?;
     Ok(import_export::to_google_auth_export(&vault.vault_entries))
 }
 
@@ -1104,7 +1104,7 @@ pub fn bulk_remove_tags(entry_ids: Vec<String>, tags: Vec<String>) -> Result<usi
 pub fn create_vault_transfer(passphrase: String) -> Result<String, String> {
     super::validate_master_password(&passphrase)?;
     let key = get_key()?;
-    let vault = store::load_vault_with_key(&key).map_err(|e| e.to_string())?;
+    let vault = load_active_vault(&key).map_err(|e| e.to_string())?;
     import_export::create_transfer_payload(&vault.vault_entries, &passphrase)
 }
 
@@ -1114,13 +1114,13 @@ pub fn import_vault_transfer(passphrase: String, payload: String) -> Result<usiz
     let imported = import_export::import_transfer_payload(&payload, &passphrase)?;
     let count = imported.len();
     let key = get_key()?;
-    let mut vault = store::load_vault_with_key(&key).map_err(|e| e.to_string())?;
+    let mut vault = load_active_vault(&key).map_err(|e| e.to_string())?;
     for entry in imported {
         if !vault.vault_entries.iter().any(|e| e.id == entry.id) {
             vault.vault_entries.push(entry);
         }
     }
-    store::save_vault_with_key(&vault, &key).map_err(|e| e.to_string())?;
+    save_active_vault(&vault, &key).map_err(|e| e.to_string())?;
     Ok(count)
 }
 
@@ -1213,7 +1213,7 @@ pub fn import_vault_share(passphrase: String, payload: String) -> Result<usize, 
     let package = import_export::import_share_payload(&payload, &passphrase)?;
     let count = package.entries.len();
     let key = get_key()?;
-    let mut vault = store::load_vault_with_key(&key).map_err(|e| e.to_string())?;
+    let mut vault = load_active_vault(&key).map_err(|e| e.to_string())?;
 
     for entry in package.entries {
         if !vault.vault_entries.iter().any(|e| e.id == entry.id) {
@@ -1230,7 +1230,7 @@ pub fn import_vault_share(passphrase: String, payload: String) -> Result<usize, 
         severity: "info".to_string(),
     });
 
-    store::save_vault_with_key(&vault, &key).map_err(|e| e.to_string())?;
+    save_active_vault(&vault, &key).map_err(|e| e.to_string())?;
     Ok(count)
 }
 
@@ -1423,6 +1423,6 @@ pub fn export_backup_to_usb(passphrase: String, drive_letter: String) -> Result<
     ensure_export_allowed()?;
     super::validate_master_password(&passphrase)?;
     let key = get_key()?;
-    crate::usb_drives::export_backup_to_drive(&passphrase, &drive_letter, &key)
+    crate::usb_drives::export_backup_to_drive(&passphrase, &drive_letter, &key, is_duress_session())
         .map_err(|_| "USB export failed — check drive letter, free space, and removable media".to_string())
 }

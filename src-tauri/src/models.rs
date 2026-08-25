@@ -244,6 +244,9 @@ pub struct AuthMeta {
     /// Enrolled FIDO2/USB security keys for vault unlock.
     #[serde(default)]
     pub security_keys: Vec<HardwareSecurityKey>,
+    /// True when a duress decoy vault is enrolled (boolean only — no path leakage).
+    #[serde(default)]
+    pub duress_enrolled: bool,
 }
 
 /// A registered FIDO2 hardware security key (credential metadata only).

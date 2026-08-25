@@ -50,7 +50,7 @@ fn genvault_backup_v1_roundtrip_preserves_format() {
         vault.vault_entries.push(sample_entry("BackupTest"));
         store::save_vault_with_key(&vault, &vmk).expect("save");
 
-        let json = store::export_backup("BackupPassphrase9!", &vmk).expect("export");
+        let json = store::export_backup("BackupPassphrase9!", &vmk, false).expect("export");
         let parsed: Value = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed["format"], "genvault-backup");
         assert_eq!(parsed["version"], 1);

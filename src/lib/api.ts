@@ -208,6 +208,11 @@ export const api = {
   guestGrantRevoke: (id: string) => invoke<void>('guest_grant_revoke', { id }),
   guestUnlock: (grantId: string, passphrase: string) =>
     invoke<GuestUnlockResult>('guest_unlock', { grantId, passphrase }),
+  hasDuressEnrolled: () => invoke<boolean>('has_duress_enrolled'),
+  enrollDuressPassword: (masterPassword: string, duressPassword: string) =>
+    invoke<void>('enroll_duress_password', { masterPassword, duressPassword }),
+  removeDuressPassword: (masterPassword: string) =>
+    invoke<void>('remove_duress_password', { masterPassword }),
   getUser: () => invoke<User | null>('get_user'),
   setupMasterPasswordFromLegacy: (password: string) =>
     invoke<User>('setup_master_password_from_legacy', { password }),

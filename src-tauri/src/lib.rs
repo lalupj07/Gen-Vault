@@ -306,6 +306,9 @@ pub fn run() {
             guest_grant_list,
             guest_grant_revoke,
             guest_unlock,
+            has_duress_enrolled,
+            enroll_duress_password,
+            remove_duress_password,
             // Utility
             get_app_version,
             get_platform,

@@ -3,7 +3,8 @@
 use crate::commands::{
     file_lock::wipe_file_lock_orphans_on_startup,
     folder_lock::wipe_folder_lock_orphans_on_startup,
-    get_key, lock_vault, media_vault::wipe_media_vault_orphans_on_startup, with_vault,
+    get_key, lock_vault, media_vault::wipe_media_vault_orphans_on_startup,
+    validate_master_password, with_vault,
 };
 use crate::guest::{self, GuestGrantPublic, GuestKind, GuestUnlockResult};
 use crate::media_vault::service::MediaVaultService;
@@ -179,6 +180,27 @@ pub fn guest_grant_revoke(id: String) -> Result<(), String> {
 #[tauri::command]
 pub fn guest_unlock(grant_id: String, passphrase: String) -> Result<GuestUnlockResult, String> {
     guest::guest_unlock(&grant_id, &passphrase).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn has_duress_enrolled() -> bool {
+    store::has_duress_enrolled()
+}
+
+#[tauri::command]
+pub fn enroll_duress_password(
+    master_password: String,
+    duress_password: String,
+) -> Result<(), String> {
+    let _key = get_key()?;
+    validate_master_password(&duress_password)?;
+    store::enroll_duress(&master_password, &duress_password).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn remove_duress_password(master_password: String) -> Result<(), String> {
+    let _key = get_key()?;
+    store::remove_duress(&master_password).map_err(|e| e.to_string())
 }
 
 #[cfg(test)]

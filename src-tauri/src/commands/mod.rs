@@ -1,4 +1,5 @@
 ﻿use parking_lot::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::OnceLock;
 use zeroize::Zeroize;
 
@@ -24,9 +25,52 @@ pub use recovery::*;
 pub use vault::*;
 
 static SESSION_KEY: OnceLock<Mutex<Option<[u8; 32]>>> = OnceLock::new();
+static SESSION_DURESS: AtomicBool = AtomicBool::new(false);
 
 pub(crate) fn session() -> &'static Mutex<Option<[u8; 32]>> {
     SESSION_KEY.get_or_init(|| Mutex::new(None))
+}
+
+/// True when the active session was unlocked via the duress password (in-memory only).
+pub fn is_duress_session() -> bool {
+    SESSION_DURESS.load(Ordering::SeqCst)
+}
+
+pub(crate) fn set_duress_session(is_duress: bool) {
+    SESSION_DURESS.store(is_duress, Ordering::SeqCst);
+}
+
+pub(crate) fn clear_session_state() {
+    set_duress_session(false);
+    let mut guard = session().lock();
+    if let Some(ref mut key) = *guard {
+        key.zeroize();
+    }
+    *guard = None;
+}
+
+/// Refuse Folder/File/Media Lock mutations during a duress decoy session.
+pub(crate) fn ensure_lock_suite_allowed() -> Result<(), String> {
+    if is_duress_session() {
+        return Err("Not available".into());
+    }
+    Ok(())
+}
+
+pub(crate) fn load_active_vault(key: &[u8; 32]) -> Result<VaultData, String> {
+    if is_duress_session() {
+        store::load_duress_vault_with_key(key).map_err(|e| e.to_string())
+    } else {
+        store::load_vault_with_key(key).map_err(|e| e.to_string())
+    }
+}
+
+pub(crate) fn save_active_vault(vault: &VaultData, key: &[u8; 32]) -> Result<(), String> {
+    if is_duress_session() {
+        store::save_duress_vault_with_key(vault, key).map_err(|e| e.to_string())
+    } else {
+        store::save_vault_with_key(vault, key).map_err(|e| e.to_string())
+    }
 }
 
 pub(crate) fn get_key() -> Result<[u8; 32], String> {
@@ -39,11 +83,7 @@ pub(crate) fn get_key() -> Result<[u8; 32], String> {
 
 #[tauri::command]
 pub fn lock_vault() -> Result<(), String> {
-    let mut guard = session().lock();
-    if let Some(ref mut key) = *guard {
-        key.zeroize();
-    }
-    *guard = None;
+    clear_session_state();
     Ok(())
 }
 
@@ -52,9 +92,9 @@ where
     F: FnOnce(&mut VaultData) -> Result<R, String>,
 {
     let key = get_key()?;
-    let mut vault = store::load_vault_with_key(&key).map_err(|e| e.to_string())?;
+    let mut vault = load_active_vault(&key)?;
     let result = f(&mut vault)?;
-    store::save_vault_with_key(&vault, &key).map_err(|e| e.to_string())?;
+    save_active_vault(&vault, &key)?;
     Ok(result)
 }
 

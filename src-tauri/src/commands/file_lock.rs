@@ -6,7 +6,7 @@ use std::sync::OnceLock;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 
-use crate::commands::get_key;
+use crate::commands::{ensure_lock_suite_allowed, get_key};
 use crate::file_lock::deep_link::FileLockDeepLink;
 use crate::file_lock::service::{
     BatchLockResult, FileLockService, LockedFilePublic, ServiceError,
@@ -113,6 +113,7 @@ pub fn file_lock_search(query: String) -> Result<Vec<LockedFilePublic>, String> 
 #[tauri::command]
 pub fn file_lock_lock(path: String, confirm_large: bool) -> Result<LockedFilePublic, String> {
     require_windows()?;
+    ensure_lock_suite_allowed()?;
     let key = get_key()?;
     service()?
         .lock_file(PathBuf::from(path).as_path(), &key, confirm_large)
@@ -125,6 +126,7 @@ pub fn file_lock_lock_batch(
     confirm_large: bool,
 ) -> Result<BatchLockResult, String> {
     require_windows()?;
+    ensure_lock_suite_allowed()?;
     let key = get_key()?;
     let paths: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
     Ok(service()?.lock_files_batch(&paths, &key, confirm_large))
@@ -133,6 +135,7 @@ pub fn file_lock_lock_batch(
 #[tauri::command]
 pub fn file_lock_unlock(id: String, open_explorer: bool) -> Result<String, String> {
     require_windows()?;
+    ensure_lock_suite_allowed()?;
     let key = get_key()?;
     let staging = service()?.unlock_to_staging(&id, &key).map_err(map_err)?;
     #[cfg(windows)]
@@ -145,6 +148,7 @@ pub fn file_lock_unlock(id: String, open_explorer: bool) -> Result<String, Strin
 #[tauri::command]
 pub fn file_lock_relock(id: String) -> Result<(), String> {
     require_windows()?;
+    ensure_lock_suite_allowed()?;
     let _key = get_key()?;
     service()?.relock(&id).map_err(map_err)
 }
@@ -152,6 +156,7 @@ pub fn file_lock_relock(id: String) -> Result<(), String> {
 #[tauri::command]
 pub fn file_lock_restore(id: String) -> Result<(), String> {
     require_windows()?;
+    ensure_lock_suite_allowed()?;
     let key = get_key()?;
     service()?.restore_to_original(&id, &key).map_err(map_err)
 }
@@ -159,6 +164,7 @@ pub fn file_lock_restore(id: String) -> Result<(), String> {
 #[tauri::command]
 pub fn file_lock_set_favorite(id: String, favorite: bool) -> Result<(), String> {
     require_windows()?;
+    ensure_lock_suite_allowed()?;
     let _key = get_key()?;
     service()?.set_favorite(&id, favorite).map_err(map_err)
 }
@@ -180,6 +186,7 @@ pub fn file_lock_settings_get() -> Result<FileLockSettings, String> {
 #[tauri::command]
 pub fn file_lock_settings_set(auto_lock_mins: u32) -> Result<FileLockSettings, String> {
     require_windows()?;
+    ensure_lock_suite_allowed()?;
     let _key = get_key()?;
     let settings = FileLockSettings { auto_lock_mins };
     save_settings(&settings)?;
@@ -190,6 +197,7 @@ pub fn file_lock_settings_set(auto_lock_mins: u32) -> Result<FileLockSettings, S
 #[tauri::command]
 pub fn file_lock_crash_recover() -> Result<(), String> {
     require_windows()?;
+    ensure_lock_suite_allowed()?;
     let _key = get_key()?;
     wipe_file_lock_orphans_on_startup()
 }

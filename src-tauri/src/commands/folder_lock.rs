@@ -6,7 +6,7 @@ use std::sync::OnceLock;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 
-use crate::commands::get_key;
+use crate::commands::{ensure_lock_suite_allowed, get_key};
 use crate::folder_lock::deep_link::FolderLockDeepLink;
 use crate::folder_lock::service::{FolderLockService, LockedFolderPublic, ServiceError};
 use crate::folder_lock::store::ActivityRow;
@@ -112,6 +112,7 @@ pub fn folder_lock_search(query: String) -> Result<Vec<LockedFolderPublic>, Stri
 #[tauri::command]
 pub fn folder_lock_lock(path: String, confirm_large: bool) -> Result<LockedFolderPublic, String> {
     require_windows()?;
+    ensure_lock_suite_allowed()?;
     let key = get_key()?;
     service()?
         .lock_folder(PathBuf::from(path).as_path(), &key, confirm_large)
@@ -121,6 +122,7 @@ pub fn folder_lock_lock(path: String, confirm_large: bool) -> Result<LockedFolde
 #[tauri::command]
 pub fn folder_lock_unlock(id: String, open_explorer: bool) -> Result<String, String> {
     require_windows()?;
+    ensure_lock_suite_allowed()?;
     let key = get_key()?;
     let staging = service()?.unlock_to_staging(&id, &key).map_err(map_err)?;
     #[cfg(windows)]
@@ -135,6 +137,7 @@ pub fn folder_lock_unlock(id: String, open_explorer: bool) -> Result<String, Str
 #[tauri::command]
 pub fn folder_lock_relock(id: String) -> Result<(), String> {
     require_windows()?;
+    ensure_lock_suite_allowed()?;
     let _key = get_key()?;
     service()?.relock(&id).map_err(map_err)
 }
@@ -142,6 +145,7 @@ pub fn folder_lock_relock(id: String) -> Result<(), String> {
 #[tauri::command]
 pub fn folder_lock_restore(id: String) -> Result<(), String> {
     require_windows()?;
+    ensure_lock_suite_allowed()?;
     let key = get_key()?;
     service()?.restore_to_original(&id, &key).map_err(map_err)
 }
@@ -149,6 +153,7 @@ pub fn folder_lock_restore(id: String) -> Result<(), String> {
 #[tauri::command]
 pub fn folder_lock_set_favorite(id: String, favorite: bool) -> Result<(), String> {
     require_windows()?;
+    ensure_lock_suite_allowed()?;
     let _key = get_key()?;
     service()?.set_favorite(&id, favorite).map_err(map_err)
 }
@@ -170,6 +175,7 @@ pub fn folder_lock_settings_get() -> Result<FolderLockSettings, String> {
 #[tauri::command]
 pub fn folder_lock_settings_set(auto_lock_mins: u32) -> Result<FolderLockSettings, String> {
     require_windows()?;
+    ensure_lock_suite_allowed()?;
     let _key = get_key()?;
     let settings = FolderLockSettings { auto_lock_mins };
     save_settings(&settings)?;
@@ -182,6 +188,7 @@ pub fn folder_lock_settings_set(auto_lock_mins: u32) -> Result<FolderLockSetting
 #[tauri::command]
 pub fn folder_lock_crash_recover() -> Result<(), String> {
     require_windows()?;
+    ensure_lock_suite_allowed()?;
     let _key = get_key()?;
     wipe_folder_lock_orphans_on_startup()
 }
