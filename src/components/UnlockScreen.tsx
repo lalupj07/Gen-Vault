@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Eye, EyeOff, Fingerprint, KeyRound, ArrowRight, AlertCircle, HardDrive, ChevronDown } from 'lucide-react';
+import { Eye, EyeOff, Fingerprint, KeyRound, ArrowRight, AlertCircle, HardDrive, ChevronDown, UserCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
-import { api, type HardwareSecurityKeyPublic } from '@/lib/api';
+import { api, type HardwareSecurityKeyPublic, type GuestUnlockResult } from '@/lib/api';
 import AccountRecoveryScreen from './AccountRecoveryScreen';
 
 export default function UnlockScreen() {
@@ -27,6 +27,11 @@ export default function UnlockScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showRecovery, setShowRecovery] = useState(false);
+  const [showGuest, setShowGuest] = useState(false);
+  const [guestGrantId, setGuestGrantId] = useState('');
+  const [guestPassphrase, setGuestPassphrase] = useState('');
+  const [showGuestPassphrase, setShowGuestPassphrase] = useState(false);
+  const [guestSuccess, setGuestSuccess] = useState<GuestUnlockResult | null>(null);
 
   useEffect(() => {
     if (!hasSecurityKey) return;
@@ -96,6 +101,26 @@ export default function UnlockScreen() {
     if (!result.success) {
       setError(result.error || 'Security key unlock failed');
       setSecret('');
+    }
+    setIsLoading(false);
+  };
+
+  const handleGuestUnlock = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setGuestSuccess(null);
+    if (!guestGrantId.trim() || !guestPassphrase) {
+      setError('Enter grant ID and passphrase');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const result = await api.guestUnlock(guestGrantId.trim(), guestPassphrase);
+      setGuestSuccess(result);
+      setGuestPassphrase('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Guest unlock failed');
+      setGuestPassphrase('');
     }
     setIsLoading(false);
   };
@@ -246,6 +271,80 @@ export default function UnlockScreen() {
               </AnimatePresence>
             </>
           )}
+
+          <button
+            type="button"
+            onClick={() => {
+              setShowGuest((v) => !v);
+              setGuestSuccess(null);
+              setError('');
+            }}
+            className="w-full mt-4 flex items-center justify-center gap-1.5 text-sm text-[color:var(--md-on-surface-variant)] min-h-[44px]"
+          >
+            Guest access
+            <ChevronDown className={cn('w-4 h-4 transition-transform', showGuest && 'rotate-180')} />
+          </button>
+          <AnimatePresence initial={false}>
+            {showGuest && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="overflow-hidden"
+              >
+                <form onSubmit={handleGuestUnlock} className="mt-2 space-y-3 p-4 rounded-xl border border-[color:var(--md-outline)] bg-[color:var(--md-surface-container)]">
+                  <p className="text-[10px] text-[color:var(--md-on-surface-variant)]">
+                    Unlock a shared item with a grant ID and passphrase — no vault login required.
+                  </p>
+                  <input
+                    type="text"
+                    value={guestGrantId}
+                    onChange={(e) => setGuestGrantId(e.target.value)}
+                    placeholder="Grant ID"
+                    autoComplete="off"
+                    spellCheck={false}
+                    className="m3-field text-sm"
+                  />
+                  <div className="relative">
+                    <input
+                      type={showGuestPassphrase ? 'text' : 'password'}
+                      value={guestPassphrase}
+                      onChange={(e) => setGuestPassphrase(e.target.value)}
+                      placeholder="Guest passphrase (min 12 chars)"
+                      autoComplete="off"
+                      spellCheck={false}
+                      className="m3-field text-sm pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowGuestPassphrase(!showGuestPassphrase)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[color:var(--md-on-surface-variant)]"
+                    >
+                      {showGuestPassphrase ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isLoading || !guestGrantId.trim() || !guestPassphrase}
+                    className="w-full flex items-center justify-center gap-2 min-h-[44px] rounded-[var(--m3-radius-lg)] border border-[color:var(--md-outline)] text-sm font-semibold disabled:opacity-50"
+                  >
+                    <UserCheck className="w-4 h-4" />
+                    {isLoading ? 'Unlocking…' : 'Unlock guest item'}
+                  </button>
+                  {guestSuccess && (
+                    <div className="p-3 rounded-lg bg-cyber-cyan/10 border border-cyber-cyan/20 text-xs text-cyber-cyan space-y-1">
+                      <p className="font-semibold">Guest access granted</p>
+                      <p>Type: {guestSuccess.kind}</p>
+                      <p className="break-all">Staging: {guestSuccess.staging_path}</p>
+                      <p className="text-[10px] opacity-80">
+                        Files are decrypted to a temporary staging folder. Access expires when the grant TTL ends.
+                      </p>
+                    </div>
+                  )}
+                </form>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <button
             type="button"

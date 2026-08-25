@@ -8,14 +8,14 @@ import {
   Globe, Clock, CheckCircle2, XCircle, Wifi, WifiOff, Plus,
   RefreshCw, Download, Trash2, Eye, EyeOff, Bell, Moon, Sun,
   Monitor, Cpu, Database, Zap, Copy, RotateCcw, User, Mail,
-  Calendar, LogOut, Edit3, Camera, Award, TrendingUp, Star
+  Calendar, LogOut, Edit3, Camera, Award, TrendingUp, Star, UserCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { COMPANY, PRODUCT } from '@/lib/company';
 import { useTheme, type Theme } from '@/lib/theme';
 import { useFont, type UiFont } from '@/lib/font';
-import { api, type VaultEntry, type DeviceEntry, type Session as ApiSession, type SecurityEvent } from '@/lib/api';
+import { api, type VaultEntry, type DeviceEntry, type Session as ApiSession, type SecurityEvent, type GuestGrantPublic, type GuestKind, type LockedFolder, type MediaItem } from '@/lib/api';
 import { promptMasterPassword } from '@/lib/prompt-master-password';
 import QRScanner from '@/components/QRScanner';
 import {
@@ -1238,6 +1238,19 @@ export function SettingsView({ onReplayWelcomeTour }: { onReplayWelcomeTour?: ()
   const [travelLoading, setTravelLoading] = useState(false);
   const [travelError, setTravelError] = useState('');
 
+  // Guest grants
+  const [guestGrants, setGuestGrants] = useState<GuestGrantPublic[]>([]);
+  const [guestLoading, setGuestLoading] = useState(false);
+  const [guestError, setGuestError] = useState('');
+  const [guestMessage, setGuestMessage] = useState('');
+  const [showGuestCreate, setShowGuestCreate] = useState(false);
+  const [guestKind, setGuestKind] = useState<GuestKind>('file');
+  const [guestItemId, setGuestItemId] = useState('');
+  const [guestLabel, setGuestLabel] = useState('');
+  const [guestPassphrase, setGuestPassphrase] = useState('');
+  const [guestTtlMins, setGuestTtlMins] = useState(15);
+  const [guestItems, setGuestItems] = useState<{ id: string; label: string }[]>([]);
+
   // Unlock method enrollment state
   const [showPasswordEnroll, setShowPasswordEnroll] = useState(false);
   const [newPassword, setNewPassword] = useState('');
@@ -1281,6 +1294,107 @@ export function SettingsView({ onReplayWelcomeTour }: { onReplayWelcomeTour?: ()
       } catch {}
     })();
   }, []);
+
+  const refreshGuestGrants = useCallback(async () => {
+    if (vaultLocked) return;
+    setGuestLoading(true);
+    setGuestError('');
+    try {
+      const grants = await api.guestGrantList();
+      setGuestGrants(grants);
+    } catch (e) {
+      setGuestError(e instanceof Error ? e.message : 'Failed to load guest grants');
+    }
+    setGuestLoading(false);
+  }, [vaultLocked]);
+
+  const loadGuestItems = useCallback(async (kind: GuestKind) => {
+    try {
+      if (kind === 'folder') {
+        const rows = await api.folderLockList();
+        setGuestItems(rows.map((r: LockedFolder) => ({ id: r.id, label: r.display_name })));
+      } else if (kind === 'file') {
+        const rows = await api.fileLockList();
+        setGuestItems(rows.map((r) => ({ id: r.id, label: r.display_name })));
+      } else {
+        const rows = await api.mediaVaultList();
+        setGuestItems(rows.map((r: MediaItem) => ({ id: r.id, label: r.title || r.original_name })));
+      }
+    } catch {
+      setGuestItems([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!vaultLocked) {
+      void refreshGuestGrants();
+    }
+  }, [vaultLocked, refreshGuestGrants]);
+
+  useEffect(() => {
+    if (showGuestCreate && !vaultLocked) {
+      void loadGuestItems(guestKind);
+    }
+  }, [showGuestCreate, guestKind, vaultLocked, loadGuestItems]);
+
+  const handleGuestRevoke = async (id: string) => {
+    setGuestError('');
+    setGuestMessage('');
+    setGuestLoading(true);
+    try {
+      await api.guestGrantRevoke(id);
+      setGuestMessage('Grant revoked');
+      await refreshGuestGrants();
+    } catch (e) {
+      setGuestError(e instanceof Error ? e.message : 'Revoke failed');
+    }
+    setGuestLoading(false);
+  };
+
+  const handleGuestCreate = async () => {
+    if (!guestItemId) {
+      setGuestError('Select an item');
+      return;
+    }
+    if (!guestLabel.trim()) {
+      setGuestError('Enter a label for this grant');
+      return;
+    }
+    if (guestPassphrase.length < 12) {
+      setGuestError('Passphrase must be at least 12 characters');
+      return;
+    }
+    setGuestError('');
+    setGuestMessage('');
+    setGuestLoading(true);
+    try {
+      const grant = await api.guestGrantCreate(
+        guestKind,
+        guestItemId,
+        guestLabel.trim(),
+        guestPassphrase,
+        guestTtlMins,
+      );
+      setGuestMessage(`Grant created — share ID: ${grant.id}`);
+      setShowGuestCreate(false);
+      setGuestItemId('');
+      setGuestLabel('');
+      setGuestPassphrase('');
+      setGuestTtlMins(15);
+      await refreshGuestGrants();
+    } catch (e) {
+      setGuestError(e instanceof Error ? e.message : 'Create grant failed');
+    }
+    setGuestLoading(false);
+  };
+
+  const formatGuestExpiry = (expiresAt: number) => {
+    const ms = expiresAt * 1000 - Date.now();
+    if (ms <= 0) return 'Expired';
+    const mins = Math.ceil(ms / 60000);
+    if (mins < 60) return `${mins} min remaining`;
+    return `${Math.ceil(mins / 60)} hr remaining`;
+  };
 
   // Persist settings on change
   const saveSettings = useCallback(async (al: boolean, bio: boolean, cs: boolean, timeout: number) => {
@@ -1578,6 +1692,136 @@ export function SettingsView({ onReplayWelcomeTour }: { onReplayWelcomeTour?: ()
             </div>
           )}
         </div>
+      </GlassCard>
+
+      <GlassCard>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-medium text-vault-light">Guest Access Grants</h3>
+          {!vaultLocked && (
+            <button
+              type="button"
+              onClick={() => { setShowGuestCreate((v) => !v); setGuestError(''); setGuestMessage(''); }}
+              disabled={guestLoading}
+              className="text-[10px] px-3 py-1.5 rounded-lg bg-cyber-cyan/10 text-cyber-cyan border border-cyber-cyan/20 hover:bg-cyber-cyan/20 transition-colors disabled:opacity-50"
+            >
+              {showGuestCreate ? 'Cancel' : 'Create grant'}
+            </button>
+          )}
+        </div>
+        <p className="text-[11px] text-vault-muted mb-4">
+          Time-limited passphrase access to locked folders, files, or media — guests unlock from the login screen without your vault password.
+        </p>
+        {vaultLocked ? (
+          <div className="text-center py-4 text-vault-muted text-sm">
+            Unlock vault to manage guest grants.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {showGuestCreate && (
+              <div className="p-4 rounded-xl bg-vault-black/30 border border-vault-border/30 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="text-xs text-vault-muted">
+                    Kind
+                    <select
+                      value={guestKind}
+                      onChange={(e) => { setGuestKind(e.target.value as GuestKind); setGuestItemId(''); }}
+                      className="w-full mt-1 px-3 py-2 rounded-lg bg-vault-black/50 border border-vault-border/40 text-vault-light text-sm"
+                    >
+                      <option value="folder">Folder</option>
+                      <option value="file">File</option>
+                      <option value="media">Media</option>
+                    </select>
+                  </label>
+                  <label className="text-xs text-vault-muted">
+                    TTL (minutes)
+                    <input
+                      type="number"
+                      min={1}
+                      max={60}
+                      value={guestTtlMins}
+                      onChange={(e) => setGuestTtlMins(Math.min(60, Math.max(1, Number(e.target.value) || 15)))}
+                      className="w-full mt-1 px-3 py-2 rounded-lg bg-vault-black/50 border border-vault-border/40 text-vault-light text-sm"
+                    />
+                  </label>
+                </div>
+                <label className="text-xs text-vault-muted block">
+                  Locked item
+                  <select
+                    value={guestItemId}
+                    onChange={(e) => setGuestItemId(e.target.value)}
+                    className="w-full mt-1 px-3 py-2 rounded-lg bg-vault-black/50 border border-vault-border/40 text-vault-light text-sm"
+                  >
+                    <option value="">Select item…</option>
+                    {guestItems.map((item) => (
+                      <option key={item.id} value={item.id}>{item.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Grant label (shown to you)"
+                  value={guestLabel}
+                  onChange={(e) => setGuestLabel(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-vault-black/50 border border-vault-border/40 text-vault-light text-sm"
+                />
+                <input
+                  type="password"
+                  placeholder="Guest passphrase (min 12 chars)"
+                  value={guestPassphrase}
+                  onChange={(e) => setGuestPassphrase(e.target.value)}
+                  autoComplete="new-password"
+                  className="w-full px-3 py-2 rounded-lg bg-vault-black/50 border border-vault-border/40 text-vault-light text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => { void handleGuestCreate(); }}
+                  disabled={guestLoading}
+                  className="w-full py-2 rounded-lg bg-cyber-cyan text-vault-black text-xs font-medium hover:bg-cyber-cyan/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  <UserCheck className="w-3.5 h-3.5" />
+                  {guestLoading ? 'Creating…' : 'Create guest grant'}
+                </button>
+              </div>
+            )}
+            {guestGrants.length === 0 ? (
+              <div className="text-center py-4 text-vault-muted text-sm">No active guest grants</div>
+            ) : (
+              <div className="space-y-2">
+                {guestGrants.map((g) => (
+                  <div key={g.id} className="flex items-start justify-between gap-3 p-3 rounded-xl bg-vault-black/20 border border-vault-border/30">
+                    <div className="min-w-0">
+                      <div className="text-sm text-vault-light truncate">{g.label}</div>
+                      <div className="text-[10px] text-vault-muted mt-0.5">
+                        {g.kind} · {formatGuestExpiry(g.expires_at)}
+                      </div>
+                      <div className="text-[10px] text-vault-muted font-mono truncate mt-1" title={g.id}>
+                        ID: {g.id}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { void handleGuestRevoke(g.id); }}
+                      disabled={guestLoading}
+                      className="text-[10px] px-2.5 py-1 rounded-lg bg-accent-danger/10 text-accent-danger border border-accent-danger/20 hover:bg-accent-danger/20 shrink-0 disabled:opacity-50"
+                    >
+                      Revoke
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {guestError && (
+              <div className="p-3 rounded-lg bg-accent-danger/10 border border-accent-danger/20 text-accent-danger text-xs">
+                {guestError}
+              </div>
+            )}
+            {guestMessage && (
+              <div className="p-3 rounded-lg bg-cyber-cyan/10 border border-cyber-cyan/20 text-cyber-cyan text-xs break-all">
+                {guestMessage}
+              </div>
+            )}
+          </div>
+        )}
       </GlassCard>
 
       <GlassCard>

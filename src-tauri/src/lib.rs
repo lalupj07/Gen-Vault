@@ -301,6 +301,11 @@ pub fn run() {
             media_vault_settings_get,
             media_vault_settings_set,
             media_vault_crash_recover,
+            // Guest grants (Phase 1 privacy)
+            guest_grant_create,
+            guest_grant_list,
+            guest_grant_revoke,
+            guest_unlock,
             // Utility
             get_app_version,
             get_platform,

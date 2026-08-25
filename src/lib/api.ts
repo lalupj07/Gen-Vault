@@ -190,6 +190,24 @@ export const api = {
   getTravelMode: () => invoke<boolean>('get_travel_mode'),
   setTravelMode: (enabled: boolean, password?: string | null) =>
     invoke<void>('set_travel_mode', { enabled, password: password ?? null }),
+  guestGrantCreate: (
+    kind: GuestKind,
+    itemId: string,
+    label: string,
+    passphrase: string,
+    ttlMins = 15,
+  ) =>
+    invoke<GuestGrantPublic>('guest_grant_create', {
+      kind,
+      itemId,
+      label,
+      passphrase,
+      ttlMins,
+    }),
+  guestGrantList: () => invoke<GuestGrantPublic[]>('guest_grant_list'),
+  guestGrantRevoke: (id: string) => invoke<void>('guest_grant_revoke', { id }),
+  guestUnlock: (grantId: string, passphrase: string) =>
+    invoke<GuestUnlockResult>('guest_unlock', { grantId, passphrase }),
   getUser: () => invoke<User | null>('get_user'),
   setupMasterPasswordFromLegacy: (password: string) =>
     invoke<User>('setup_master_password_from_legacy', { password }),
@@ -565,6 +583,22 @@ export interface MediaVaultSettings {
 export interface MediaImportBatchResult {
   imported: MediaItem[];
   failed: { path: string; error: string }[];
+}
+
+export type GuestKind = 'folder' | 'file' | 'media';
+
+export interface GuestGrantPublic {
+  id: string;
+  kind: GuestKind;
+  item_id: string;
+  label: string;
+  expires_at: number;
+}
+
+export interface GuestUnlockResult {
+  kind: GuestKind;
+  item_id: string;
+  staging_path: string;
 }
 
 export { generateTotpCode, verifyTotpCode, generateTotpSecret };
