@@ -59,6 +59,24 @@ pub fn run() {
                     stash_file_lock_deep_link(link.clone());
                     let _ = app.emit("file-lock-deep-link", &link);
                 }
+
+                use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+
+                let panic_shortcut = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyL);
+                app.handle().plugin(
+                    tauri_plugin_global_shortcut::Builder::new()
+                        .with_handler(move |app, shortcut, event| {
+                            if event.state() != ShortcutState::Pressed {
+                                return;
+                            }
+                            if shortcut == &panic_shortcut {
+                                let _ = execute_panic_lock();
+                                let _ = app.emit("panic-locked", ());
+                            }
+                        })
+                        .build(),
+                )?;
+                let _ = app.global_shortcut().register(panic_shortcut);
             }
             let _ = app;
             Ok(())
@@ -74,6 +92,7 @@ pub fn run() {
             log_in,
             log_out,
             lock_vault,
+            panic_lock,
             setup_master_password_from_legacy,
             complete_onboarding,
             update_user,

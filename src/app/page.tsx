@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
+import { ShieldAlert } from 'lucide-react';
 import ParticleField from '@/components/ParticleField';
 import Sidebar from '@/components/Sidebar';
 import Dashboard from '@/components/Dashboard';
@@ -32,7 +33,7 @@ import MobileShell from '@/components/mobile/MobileShell';
 
 export default function Home() {
   const router = useRouter();
-  const { user, isAuthenticated, vaultLocked, isLoading: authLoading, logOut, completeOnboarding, lockVault } = useAuth();
+  const { user, isAuthenticated, vaultLocked, isLoading: authLoading, logOut, completeOnboarding, lockVault, panicLock } = useAuth();
   const [isBootLoading, setIsBootLoading] = useState(true);
   const [activeView, setActiveView] = useState('dashboard');
   const [collapsed, setCollapsed] = useState(false);
@@ -444,6 +445,15 @@ export default function Home() {
               <div className="w-1.5 h-1.5 rounded-full bg-cyber-emerald" />
               <span className="text-[10px] text-cyber-emerald font-medium">Protected</span>
             </div>
+            <button
+              type="button"
+              onClick={() => void panicLock()}
+              title="Panic lock (Ctrl+Shift+L) — lock vault and wipe staging"
+              className="flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-full text-accent-danger bg-accent-danger/10 border border-accent-danger/30 hover:bg-accent-danger/20 transition-all"
+            >
+              <ShieldAlert className="w-3 h-3" />
+              Panic lock
+            </button>
             <button
               onClick={logOut}
               className="text-[10px] px-2.5 py-1 rounded-full text-vault-muted hover:text-accent-danger bg-white/[0.02] border border-vault-border/30 hover:border-accent-danger/30 transition-all"

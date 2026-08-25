@@ -43,6 +43,7 @@ image = { version = "0.25", default-features = false, features = ["jpeg", "png",
 
 [target.'cfg(not(target_os = "android"))'.dependencies]
 keyring = "3"
+tauri-plugin-global-shortcut = "2"
 
 [dev-dependencies]
 tempfile = "3"

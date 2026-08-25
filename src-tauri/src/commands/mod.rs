@@ -10,6 +10,7 @@ pub mod file_lock;
 pub mod folder_lock;
 pub mod media_vault;
 pub mod hardware_keys;
+pub mod privacy;
 pub mod recovery;
 pub mod vault;
 
@@ -18,6 +19,7 @@ pub use file_lock::*;
 pub use folder_lock::*;
 pub use media_vault::*;
 pub use hardware_keys::*;
+pub use privacy::*;
 pub use recovery::*;
 pub use vault::*;
 

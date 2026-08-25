@@ -185,6 +185,7 @@ export const api = {
   logIn: (username: string) => invoke<User>('log_in', { username }),
   logOut: () => invoke<void>('log_out'),
   lockVault: () => invoke<void>('lock_vault'),
+  panicLock: () => invoke<void>('panic_lock'),
   getUser: () => invoke<User | null>('get_user'),
   setupMasterPasswordFromLegacy: (password: string) =>
     invoke<User>('setup_master_password_from_legacy', { password }),

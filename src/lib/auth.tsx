@@ -44,6 +44,7 @@ interface AuthContextType extends AuthState {
   unlockWithSecurityKey: (keyId: string, password: string, pin?: string) => Promise<{ success: boolean; error?: string }>;
   refreshUnlockMethods: () => Promise<void>;
   lockVault: () => Promise<void>;
+  panicLock: () => Promise<void>;
 }
 
 // ===== Rate Limiting =====
@@ -270,6 +271,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState(prev => ({ ...prev, vaultLocked: true }));
   }, []);
 
+  const applyPanicLockedState = useCallback(async () => {
+    const { clearSecureClipboard } = await import('@/lib/secure-clipboard');
+    await clearSecureClipboard().catch(() => {});
+    setState(prev => ({ ...prev, vaultLocked: true }));
+  }, []);
+
+  const panicLock = useCallback(async () => {
+    await api.panicLock().catch(() => {});
+    await applyPanicLockedState();
+  }, [applyPanicLockedState]);
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    (async () => {
+      try {
+        const { listen } = await import('@tauri-apps/api/event');
+        unlisten = await listen('panic-locked', () => {
+          void applyPanicLockedState();
+        });
+      } catch { /* not in Tauri */ }
+    })();
+    return () => { unlisten?.(); };
+  }, [applyPanicLockedState]);
+
   // ===== Log Out =====
   const logOut = useCallback(async () => {
     const { clearSecureClipboard } = await import('@/lib/secure-clipboard');
@@ -388,7 +413,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ...state, createAccount, logIn, logOut,
       completeOnboarding, updateUser, setAuthFlow, resetToSetup,
       unlockWithPassword, unlockWithPin, unlockWithHello, unlockWithSecurityKey,
-      refreshUnlockMethods, lockVault,
+      refreshUnlockMethods, lockVault, panicLock,
     }}>
       {children}
     </AuthContext.Provider>
