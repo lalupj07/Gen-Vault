@@ -99,6 +99,7 @@ export default function MobileShell() {
   const [addIntent, setAddIntent] = useState<AddIntent>({ kind: 'totp', scan: true });
   const [fabMenu, setFabMenu] = useState(false);
   const [undoTrash, setUndoTrash] = useState<{ id: string; name: string } | null>(null);
+  const [snackNotice, setSnackNotice] = useState<string | null>(null);
 
   /** In-app stack — never rely on WebView history (Android exits when canGoBack is false). */
   const framesRef = useRef<NavState[]>([ROOT_NAV]);
@@ -106,6 +107,7 @@ export default function MobileShell() {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const goBackRef = useRef<() => boolean>(() => false);
   const undoTimerRef = useRef<number | null>(null);
+  const noticeTimerRef = useRef<number | null>(null);
   const fabLongRef = useRef<number | null>(null);
   const fabDidLongRef = useRef(false);
   const swipe = useRef<{
@@ -218,6 +220,7 @@ export default function MobileShell() {
 
   useEffect(() => () => {
     if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
+    if (noticeTimerRef.current) window.clearTimeout(noticeTimerRef.current);
     if (fabLongRef.current) window.clearTimeout(fabLongRef.current);
   }, []);
 
@@ -332,21 +335,36 @@ export default function MobileShell() {
   };
 
   const offerUndoTrash = (info: { id: string; name: string }) => {
+    setSnackNotice(null);
     setUndoTrash(info);
     if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
     undoTimerRef.current = window.setTimeout(() => setUndoTrash(null), UNDO_MS);
   };
 
+  const showSnackNotice = (message: string) => {
+    setUndoTrash(null);
+    if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
+    setSnackNotice(message);
+    if (noticeTimerRef.current) window.clearTimeout(noticeTimerRef.current);
+    noticeTimerRef.current = window.setTimeout(() => setSnackNotice(null), 4000);
+  };
+
   const undoSoftDelete = async () => {
     if (!undoTrash) return;
     const id = undoTrash.id;
+    if (travelMode) {
+      showSnackNotice('Blocked in travel mode');
+      return;
+    }
     setUndoTrash(null);
     if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
     try {
       await api.restoreVaultEntry(id);
       await refresh();
-    } catch {
-      /* keep UI calm; entry remains in trash */
+    } catch (e) {
+      // Never echo secrets; map known travel refusal to the shared copy.
+      const raw = e instanceof Error ? e.message : '';
+      showSnackNotice(raw.includes('travel') ? 'Blocked in travel mode' : 'Could not restore entry');
     }
   };
 
@@ -778,6 +796,22 @@ export default function MobileShell() {
             >
               Undo
             </button>
+          </motion.div>
+        )}
+        {!undoTrash && snackNotice && (
+          <motion.div
+            key="notice-snack"
+            className="absolute left-4 right-4 z-40 flex items-center gap-3 m3-glass px-4 py-3"
+            style={{ bottom: 'calc(5.5rem + env(safe-area-inset-bottom))' }}
+            initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            transition={SPRING_SOFT}
+            role="status"
+          >
+            <p className="flex-1 text-sm text-[color:var(--md-on-surface)] truncate">
+              {snackNotice}
+            </p>
           </motion.div>
         )}
       </AnimatePresence>
