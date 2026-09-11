@@ -4,7 +4,6 @@
   "description": "Default capabilities for GenVault",
   "windows": ["main"],
   "permissions": [
-    "core:default",
-    "global-shortcut:default"
+    "core:default"
   ]
 }

@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Highlights
 
-Wave A (Android): Codes-first calm UX, soft-delete trash, Aegis import, and on-device Autofill — no new GenXis network endpoints.
+Wave A (Android): Codes-first calm UX, soft-delete trash, Aegis import, and Autofill scaffold (unlock Intent + Settings) — no new GenXis network endpoints.
 
 ### Added
 
@@ -30,15 +30,15 @@ Wave A (Android): Codes-first calm UX, soft-delete trash, Aegis import, and on-d
 - Import TOTP entries from **Aegis JSON** export (secrets never logged)
 
 #### Android Autofill
-- System Autofill service for password entries (and OTP when the form hints OTP)
-- **Off by default** — enable in Settings + system Autofill picker
-- Unlock gate when vault is locked; Travel mode disables Autofill; duress session fills **decoy vault only**
-- Fill metadata only until the user selects a dataset — no passwords logged
+- **Scaffold** — system AutofillService registration, Settings enable toggle (off by default), and unlock Intent when the vault is locked
+- Travel mode disables Autofill; duress session would fill **decoy vault only** once fill is wired
+- **Dataset fill deferred** — password/OTP fill pending WebView↔AutofillService session bridge (not shipped in 2.3.0)
 
 ### Security / privacy
 
-- Autofill stays **on-device**; no new shared data with GenXis (see `store/PLAY_DATA_SAFETY.md`)
-- Travel and duress rules apply to Autofill and Trash as in Wave A design spec
+- Autofill stays **on-device** (scaffold); no new shared data with GenXis (see `store/PLAY_DATA_SAFETY.md`)
+- Travel and duress rules apply to Autofill gates and Trash as in Wave A design spec
+- Secret exports exclude soft-deleted trash by default
 
 ### Notes
 

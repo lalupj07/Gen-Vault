@@ -17,7 +17,7 @@ GenVault is an offline-first two-factor authentication vault and encrypted crede
 **Features**
 
 - **Offline TOTP / 2FA** — Generate time-based one-time passwords without internet
-- **Android Autofill** — Optional on-device Autofill for passwords (and OTP when the form asks); off until you enable it — credentials never leave your device for Autofill
+- **Android Autofill (scaffold)** — Optional system Autofill service with Settings toggle and unlock Intent; dataset fill pending a later session bridge — credentials never leave your device for Autofill
 - **Codes-first UX** — Calm Codes landing, scan-first FAB, issuer icons, and intentional empty states
 - **Soft-delete trash** — Restore deleted entries for 30 days, fully offline
 - **Aegis import** — Import authenticator accounts from an Aegis JSON export

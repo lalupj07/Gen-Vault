@@ -688,10 +688,11 @@ pub fn export_vault() -> Result<String, String> {
     let key = get_key()?;
     let vault = load_active_vault(&key).map_err(|e| e.to_string())?;
 
-    // Export entries (without secrets for security)
+    // Export entries (without secrets for security); trash excluded by default
     let export: Vec<serde_json::Value> = vault
         .vault_entries
         .iter()
+        .filter(|e| is_active(e))
         .map(|e| {
             serde_json::json!({
                 "name": e.name,
@@ -1144,7 +1145,12 @@ pub fn export_vault_json() -> Result<String, String> {
     ensure_export_allowed()?;
     let key = get_key()?;
     let vault = load_active_vault(&key).map_err(|e| e.to_string())?;
-    let public: Vec<VaultEntryPublic> = vault.vault_entries.iter().map(entry_public).collect();
+    let public: Vec<VaultEntryPublic> = vault
+        .vault_entries
+        .iter()
+        .filter(|e| is_active(e))
+        .map(entry_public)
+        .collect();
     serde_json::to_string_pretty(&public).map_err(|e| e.to_string())
 }
 
@@ -1159,7 +1165,13 @@ pub fn export_vault_secrets_json(password: String) -> Result<String, String> {
         return Err("Incorrect master password".to_string());
     }
     let vault = load_active_vault(&key).map_err(|e| e.to_string())?;
-    Ok(import_export::to_google_auth_export(&vault.vault_entries))
+    let active: Vec<_> = vault
+        .vault_entries
+        .iter()
+        .filter(|e| is_active(e))
+        .cloned()
+        .collect();
+    Ok(import_export::to_google_auth_export(&active))
 }
 
 #[tauri::command]
@@ -1170,7 +1182,7 @@ pub fn export_vault_csv() -> Result<String, String> {
         let mut csv = String::from(
             "Name,Issuer,Category,Icon,Color,Digits,Period,CreatedAt,LastUsed,Tags,Favorite\n",
         );
-        for entry in &vault.vault_entries {
+        for entry in vault.vault_entries.iter().filter(|e| is_active(e)) {
             let tags_str = entry.tags.join(";");
             csv.push_str(&format!(
                 "{},{},{},{},{},{},{},{},{},{},{}\n",
@@ -1269,7 +1281,13 @@ pub fn create_vault_transfer(passphrase: String) -> Result<String, String> {
     super::validate_master_password(&passphrase)?;
     let key = get_key()?;
     let vault = load_active_vault(&key).map_err(|e| e.to_string())?;
-    import_export::create_transfer_payload(&vault.vault_entries, &passphrase)
+    let active: Vec<_> = vault
+        .vault_entries
+        .iter()
+        .filter(|e| is_active(e))
+        .cloned()
+        .collect();
+    import_export::create_transfer_payload(&active, &passphrase)
 }
 
 #[tauri::command]
@@ -1328,7 +1346,7 @@ pub fn create_vault_share(
             let entry = vault
                 .vault_entries
                 .iter()
-                .find(|e| e.id == *id)
+                .find(|e| e.id == *id && is_active(e))
                 .ok_or_else(|| format!("Entry not found: {}", id))?;
             names.push(entry.name.clone());
             selected.push(entry.clone());

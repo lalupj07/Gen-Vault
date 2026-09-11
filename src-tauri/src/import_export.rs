@@ -254,7 +254,6 @@ struct AegisOtpInfo {
     #[serde(default)]
     period: Option<u32>,
     #[serde(default)]
-    #[allow(dead_code)]
     algo: Option<String>,
 }
 
@@ -294,6 +293,21 @@ pub fn import_aegis_json(json: &str, category: &str) -> Result<Vec<VaultEntry>, 
     for item in db.entries {
         if !item.entry_type.eq_ignore_ascii_case("totp") {
             continue;
+        }
+
+        let algo = item
+            .info
+            .algo
+            .as_deref()
+            .unwrap_or("SHA1")
+            .replace([' ', '-'], "")
+            .to_uppercase();
+        if algo != "SHA1" {
+            return Err(format!(
+                "Unsupported Aegis algorithm '{}' for entry '{}' (only SHA1 is supported)",
+                item.info.algo.as_deref().unwrap_or(""),
+                item.name
+            ));
         }
 
         let normalized = item.info.secret.replace([' ', '-'], "").to_uppercase();

@@ -1289,6 +1289,13 @@ export function SettingsView({ onReplayWelcomeTour }: { onReplayWelcomeTour?: ()
   const [aegisFileName, setAegisFileName] = useState('');
   const aegisFileRef = useRef<HTMLInputElement>(null);
 
+  // Desktop trash (soft-delete restore / purge)
+  const [trashItems, setTrashItems] = useState<VaultEntry[]>([]);
+  const [trashLoading, setTrashLoading] = useState(false);
+  const [trashBusyId, setTrashBusyId] = useState<string | null>(null);
+  const [trashError, setTrashError] = useState('');
+  const [trashMessage, setTrashMessage] = useState('');
+
   const refreshDuressStatus = useCallback(async () => {
     try {
       setDuressEnrolled(await api.hasDuressEnrolled());
@@ -1698,6 +1705,55 @@ export function SettingsView({ onReplayWelcomeTour }: { onReplayWelcomeTour?: ()
       setImportError(e instanceof Error ? e.message : 'Failed to import');
     }
     setImportLoading(false);
+  };
+
+  const refreshTrash = useCallback(async () => {
+    setTrashLoading(true);
+    setTrashError('');
+    try {
+      setTrashItems(await api.listTrashedEntries());
+    } catch (e) {
+      setTrashError(e instanceof Error ? e.message : 'Could not load trash');
+    } finally {
+      setTrashLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!vaultLocked) void refreshTrash();
+  }, [vaultLocked, refreshTrash]);
+
+  const handleTrashRestore = async (id: string) => {
+    if (travelMode) return;
+    setTrashBusyId(id);
+    setTrashError('');
+    setTrashMessage('');
+    try {
+      await api.restoreVaultEntry(id);
+      setTrashMessage('Entry restored');
+      await refreshTrash();
+    } catch (e) {
+      setTrashError(e instanceof Error ? e.message : 'Restore failed');
+    } finally {
+      setTrashBusyId(null);
+    }
+  };
+
+  const handleTrashPurge = async (entry: VaultEntry) => {
+    if (travelMode) return;
+    if (!window.confirm(`Delete “${entry.name}” forever? This cannot be undone.`)) return;
+    setTrashBusyId(entry.id);
+    setTrashError('');
+    setTrashMessage('');
+    try {
+      await api.purgeVaultEntry(entry.id);
+      setTrashMessage('Entry permanently deleted');
+      await refreshTrash();
+    } catch (e) {
+      setTrashError(e instanceof Error ? e.message : 'Delete forever failed');
+    } finally {
+      setTrashBusyId(null);
+    }
   };
 
   const clearAegisPreview = () => {
@@ -2244,6 +2300,70 @@ export function SettingsView({ onReplayWelcomeTour }: { onReplayWelcomeTour?: ()
             </div>
           )}
         </div>
+      </GlassCard>
+
+      {/* Trash */}
+      <GlassCard>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-sm font-medium text-vault-light">Trash</h3>
+            <p className="text-[11px] text-vault-muted mt-1">
+              Soft-deleted entries · restore within 30 days
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void refreshTrash()}
+            disabled={trashLoading || vaultLocked}
+            className="px-2.5 py-1 rounded-lg bg-white/[0.03] text-vault-muted text-xs border border-vault-border/30 disabled:opacity-50"
+          >
+            Refresh
+          </button>
+        </div>
+        {travelMode && (
+          <div className="mb-3 p-2.5 rounded-lg bg-cyber-cyan/10 border border-cyber-cyan/20 text-xs text-cyber-cyan">
+            Blocked in travel mode — restore and delete forever are disabled.
+          </div>
+        )}
+        {trashError && <p className="mb-2 text-xs text-accent-danger">{trashError}</p>}
+        {trashMessage && <p className="mb-2 text-xs text-cyber-emerald">{trashMessage}</p>}
+        {trashLoading ? (
+          <p className="text-xs text-vault-muted">Loading…</p>
+        ) : trashItems.length === 0 ? (
+          <p className="text-xs text-vault-muted">Trash is empty</p>
+        ) : (
+          <ul className="space-y-2">
+            {trashItems.map((e) => (
+              <li
+                key={e.id}
+                className="flex items-center gap-3 p-2.5 rounded-lg bg-vault-black/40 border border-vault-border/30"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] text-vault-muted truncate">{e.issuer || e.category || 'Entry'}</p>
+                  <p className="text-sm text-vault-light truncate">{e.name}</p>
+                </div>
+                <button
+                  type="button"
+                  disabled={travelMode || trashBusyId === e.id}
+                  onClick={() => void handleTrashRestore(e.id)}
+                  className="px-2.5 py-1.5 rounded-lg bg-cyber-cyan/10 text-cyber-cyan text-xs border border-cyber-cyan/20 disabled:opacity-40 inline-flex items-center gap-1"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" aria-hidden />
+                  Restore
+                </button>
+                <button
+                  type="button"
+                  disabled={travelMode || trashBusyId === e.id}
+                  onClick={() => void handleTrashPurge(e)}
+                  className="px-2.5 py-1.5 rounded-lg bg-accent-danger/10 text-accent-danger text-xs border border-accent-danger/20 disabled:opacity-40 inline-flex items-center gap-1"
+                >
+                  <Trash2 className="w-3.5 h-3.5" aria-hidden />
+                  Delete forever
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </GlassCard>
 
       {/* Import / Export */}

@@ -115,3 +115,38 @@ fn import_aegis_command_dedups_active_ignores_trash() {
         assert!(third[0].deleted_at.is_none());
     });
 }
+
+#[test]
+fn import_aegis_rejects_non_sha1_algo() {
+    let json = r#"{
+  "version": 1,
+  "header": { "slots": null, "params": null },
+  "db": {
+    "version": 3,
+    "entries": [
+      {
+        "type": "totp",
+        "uuid": "01234567-89ab-cdef-0123-456789abcdef",
+        "name": "user@ex.com",
+        "issuer": "Example",
+        "note": "",
+        "favorite": false,
+        "icon": null,
+        "info": {
+          "secret": "JBSWY3DPEHPK3PXP",
+          "algo": "SHA256",
+          "digits": 6,
+          "period": 30
+        },
+        "groups": []
+      }
+    ],
+    "groups": []
+  }
+}"#;
+    let err = import_export::import_aegis_json(json, "Imported").unwrap_err();
+    assert!(
+        err.to_lowercase().contains("sha1") || err.to_lowercase().contains("algorithm"),
+        "expected clear SHA1-only error, got: {err}"
+    );
+}
