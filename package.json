@@ -1,8 +1,8 @@
 {
   "name": "genvault",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "private": true,
-  "description": "GenVault v2.2.0 — Offline Authentication Vault by GenXis Innovations",
+  "description": "GenVault v2.3.0 — Offline Authentication Vault by GenXis Innovations",
   "author": "GenXis Innovations <genxisinnovation@outlook.com>",
   "license": "MIT",
   "scripts": {
@@ -15,6 +15,10 @@
     "tauri:build": "tauri build",
     "tauri:android:dev": "tauri android dev",
     "tauri:android:build": "tauri android build",
+    "build:play": "powershell -ExecutionPolicy Bypass -File ./scripts/build-play-aab.ps1",
+    "build:play:clean": "powershell -ExecutionPolicy Bypass -File ./scripts/build-play-aab.ps1 -Clean",
+    "build:play:assets": "node scripts/generate-play-icon.js",
+    "build:play:screenshots": "powershell -ExecutionPolicy Bypass -File ./scripts/capture-play-screenshots.ps1",
     "build:release": "powershell -ExecutionPolicy Bypass -File ./scripts/build-release.ps1",
     "build:release:clean": "powershell -ExecutionPolicy Bypass -File ./scripts/build-release.ps1 -Clean",
     "build:msi": "powershell -ExecutionPolicy Bypass -File ./scripts/build-release.ps1 -MsiOnly",

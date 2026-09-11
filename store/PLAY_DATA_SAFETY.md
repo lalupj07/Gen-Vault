@@ -15,6 +15,7 @@ Align with `store/PRIVACY_POLICY.md`. Do not claim “no data collected” — v
 | Users can request deletion? | Delete app data / uninstall |
 | Ads? | No |
 | Optional HIBP | Disclosed; hash prefix only |
+| Android Autofill (v2.3.0+) | On-device only; **no new shared data** |
 
 ## Detailed guidance
 
@@ -22,11 +23,13 @@ Align with `store/PRIVACY_POLICY.md`. Do not claim “no data collected” — v
 
 - **Personal info → User IDs / credentials** — Usernames, passwords, TOTP secrets, notes, and attachments stored locally in the encrypted vault
 - **App activity** — Not collected or transmitted to GenXis
+- **Android Autofill** — Uses the same on-device vault credentials to fill username/password/OTP into other apps after the user enables GenVault as the Autofill service. Credentials are not sent to GenXis or any new third party.
 
 ### Collection & sharing
 
 - **Collected:** Yes (stored on device as part of app functionality)
 - **Shared with third parties:** No (GenXis does not receive vault contents)
+- **Autofill (v2.3.0+):** On-device only. Filling into another app is a local OS Autofill handoff; GenXis does not receive filled values. No new data types are shared off-device.
 - **Optional HIBP:** User-initiated only; device sends a SHA-1 hash prefix over HTTPS to Have I Been Pwned; GenXis does not receive this data
 
 ### Security practices

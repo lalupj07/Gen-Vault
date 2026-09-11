@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.3.0] - 2026-09-11
+
+### Highlights
+
+Wave A (Android): Codes-first calm UX, soft-delete trash, Aegis import, and on-device Autofill — no new GenXis network endpoints.
+
+### Added
+
+#### Android UX
+- **Codes-first landing** — default tab is Codes; Home removed from primary bottom nav (pulse under More → Dashboard)
+- **Empty states** — Codes and Vault screenshot-ready empty screens with clear next actions
+- **Scan-first FAB** — primary Scan QR; long-press for Add password / Manual secret
+- **Issuer icons** — bundled map + monogram fallback (no CDN)
+- **Trash UI** — restore and forever-delete for soft-deleted entries
+
+#### Soft-delete (shared vault)
+- Soft-delete with **30-day** local restore window and purge
+- Travel mode blocks trash restore / export of deleted items
+
+#### Aegis import
+- Import TOTP entries from **Aegis JSON** export (secrets never logged)
+
+#### Android Autofill
+- System Autofill service for password entries (and OTP when the form hints OTP)
+- **Off by default** — enable in Settings + system Autofill picker
+- Unlock gate when vault is locked; Travel mode disables Autofill; duress session fills **decoy vault only**
+- Fill metadata only until the user selects a dataset — no passwords logged
+
+### Security / privacy
+
+- Autofill stays **on-device**; no new shared data with GenXis (see `store/PLAY_DATA_SAFETY.md`)
+- Travel and duress rules apply to Autofill and Trash as in Wave A design spec
+
+### Notes
+
+- Android `versionCode` **2003000** (`versionName` 2.3.0)
+- Bitwarden / KeePass import, Windows Autofill, Wave B lock-suite, and Wave C privacy remain out of scope
+- Design: `docs/superpowers/specs/2026-09-11-wave-a-android-ux-design.md`
+
+---
+
 ## [2.2.0] - 2026-08-25
 
 ### Highlights
@@ -180,6 +221,7 @@ No cloud account required. Vault data stays on-device.
 - Browser-only mode is disabled; use the GenVault app
 - Binaries are distributed via Microsoft Store (Windows) and GitHub Releases for testers; source is MIT
 
+[2.3.0]: https://github.com/lalupj07/Gen-Vault/releases/tag/v2.3.0
 [2.2.0]: https://github.com/lalupj07/Gen-Vault/releases/tag/v2.2.0
 [2.1.0]: https://github.com/lalupj07/Gen-Vault/releases/tag/v2.1.0
 [2.0.0]: https://github.com/lalupj07/Gen-Vault/releases/tag/v2.0.0

@@ -26,13 +26,20 @@ In **Google Play Console → Setup → App signing**:
 
 ## 3. Build and upload signed AAB
 
-Build a release Android App Bundle signed with the upload keystore:
+1. Copy `store/keystore.properties.example` → `src-tauri/gen/android/keystore.properties` and fill in upload keystore paths/passwords (file is gitignored).
+2. Build a release AAB signed with the upload keystore:
 
 ```bash
-npm run tauri android build -- --apk false
+npm run build:play
 ```
 
-Upload the resulting `.aab` from the release output directory to Play Console (Internal testing or Production track). Play re-signs with the app signing key after upload.
+Or:
+
+```bash
+powershell -ExecutionPolicy Bypass -File ./scripts/build-play-aab.ps1
+```
+
+3. Upload `dist/release/vX.Y.Z/android/play/GenVault-vX.Y.Z-play-universal-release.aab` to Play Console (Internal testing first). Play re-signs with the app signing key after upload.
 
 ## 4. Store credentials securely
 
@@ -49,16 +56,24 @@ Upload the resulting `.aab` from the release output directory to Play Console (I
 
 Google Play requires **`versionCode` to increase monotonically** on every upload. A lower or duplicate `versionCode` is rejected.
 
-| Field | Source | Current (v1.0.0) |
+| Field | Source | Current (v2.3.0) |
 |-------|--------|------------------|
-| `versionName` | `src-tauri/tauri.conf.json` → `"version"` | `1.0.0` |
-| `versionCode` | `src-tauri/gen/android/app/tauri.properties` (generated at build) | `1000000` |
+| `versionName` | `src-tauri/tauri.conf.json` → `"version"` | `2.3.0` |
+| `versionCode` | `src-tauri/gen/android/app/tauri.properties` (generated at build) | `2003000` |
 
 **Before each Play upload:**
 
-1. Bump `"version"` in `src-tauri/tauri.conf.json` (semver, e.g. `1.0.1`).
-2. Rebuild Android — Tauri regenerates `tauri.properties` with a new `versionCode`.
-3. Confirm `tauri.android.versionCode` in the generated properties is **strictly greater** than the last uploaded build.
-4. If you must hotfix without a semver bump, increment `versionCode` manually in the generated file before signing — but prefer syncing `versionName` with `tauri.conf.json`.
+1. Bump `"version"` in `src-tauri/tauri.conf.json` (and keep `package.json` / Cargo in sync).
+2. Ensure `src-tauri/gen/android/keystore.properties` exists (gitignored) — see `store/keystore.properties.example`.
+3. Build: `npm run build:play` (or `powershell -File ./scripts/build-play-aab.ps1`).
+4. Confirm `tauri.android.versionCode` is **strictly greater** than the last uploaded build.
+5. Upload `dist/release/vX.Y.Z/android/play/GenVault-vX.Y.Z-play-universal-release.aab` to Play Console.
 
 **Rule of thumb:** Every Play upload gets a new, higher `versionCode`. Never reuse a `versionCode` already accepted by Play.
+
+## 6. Local upload key location (this machine)
+
+Upload keystore lives **outside** the repo (default): `%USERPROFILE%\.genvault\genvault-upload.jks`  
+Credentials file (back up, then prefer password manager): `%USERPROFILE%\.genvault\upload-credentials.txt`
+
+Register the upload certificate SHA-256 in Play Console → App signing when enrolling Play App Signing.

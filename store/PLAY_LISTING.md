@@ -17,6 +17,10 @@ GenVault is an offline-first two-factor authentication vault and encrypted crede
 **Features**
 
 - **Offline TOTP / 2FA** — Generate time-based one-time passwords without internet
+- **Android Autofill** — Optional on-device Autofill for passwords (and OTP when the form asks); off until you enable it — credentials never leave your device for Autofill
+- **Codes-first UX** — Calm Codes landing, scan-first FAB, issuer icons, and intentional empty states
+- **Soft-delete trash** — Restore deleted entries for 30 days, fully offline
+- **Aegis import** — Import authenticator accounts from an Aegis JSON export
 - **AES-256-GCM encryption** — Vault data encrypted at rest with authenticated encryption
 - **Argon2id key derivation** — Master password stretched with memory-hard KDF
 - **Biometric unlock** — Fingerprint or face unlock on supported Android devices
@@ -54,12 +58,9 @@ Capture on a physical device or emulator before upload. Do not commit screenshot
 
 | Asset | Spec | Required shots |
 |-------|------|----------------|
-| App icon | 512×512 PNG (Play high-res icon) | Launcher icon (already in APK) |
-| Feature graphic | 1024×500 PNG or JPG | Branded banner for store listing |
-| Phone screenshots | Min 2; recommend 4+ | 1. Unlock screen |
-| | | 2. TOTP / codes list |
-| | | 3. Vault / credentials view |
-| | | 4. About & legal screen |
+| App icon | 512×512 PNG (Play high-res icon) | `store/play/app-icon-512.png` — run `npm run build:play:assets` |
+| Feature graphic | 1024×500 PNG or JPG | `store/play/feature-graphic-1024x500.png` |
+| Phone screenshots | Min 2; recommend 4+ | Run `npm run build:play:screenshots` → `store/play/screenshots/` |
 
 **Screenshot tips**
 
