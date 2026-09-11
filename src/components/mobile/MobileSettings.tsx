@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Fingerprint, Download, Upload, Info, Sun, Moon, Monitor, Trash2, Plane, ShieldAlert, UserCheck } from 'lucide-react';
+import { Fingerprint, Download, Upload, Info, Sun, Moon, Monitor, Trash2, Plane, ShieldAlert, UserCheck, KeyRound, ExternalLink } from 'lucide-react';
 import { api, type AppSettings, type GuestGrantPublic, type GuestKind, type LockedFolder, type MediaItem } from '@/lib/api';
 import { PRODUCT } from '@/lib/company';
 import { cn } from '@/lib/utils';
@@ -36,6 +36,11 @@ export default function MobileSettings({ onRefresh, onOpenAbout }: Props) {
   const [travelLoading, setTravelLoading] = useState(false);
   const [travelError, setTravelError] = useState('');
 
+  const [autofillEnabled, setAutofillEnabled] = useState(false);
+  const [autofillLoading, setAutofillLoading] = useState(false);
+  const [autofillError, setAutofillError] = useState('');
+  const [autofillCoach, setAutofillCoach] = useState(false);
+
   const [duressEnrolled, setDuressEnrolled] = useState(false);
   const [duressLoading, setDuressLoading] = useState(false);
   const [duressError, setDuressError] = useState('');
@@ -66,7 +71,15 @@ export default function MobileSettings({ onRefresh, onOpenAbout }: Props) {
       setSettings(s);
       setHelloOk(avail);
       setHasHello(info.methods.includes('hello'));
+      setAutofillEnabled(!!s.autofill_enabled);
       setDuressEnrolled(await api.hasDuressEnrolled().catch(() => false));
+      try {
+        if (typeof window !== 'undefined' && !window.localStorage.getItem('genvault_autofill_coach_seen')) {
+          setAutofillCoach(true);
+        }
+      } catch {
+        /* ignore */
+      }
     } catch {
       /* ignore */
     }
@@ -165,6 +178,42 @@ export default function MobileSettings({ onRefresh, onOpenAbout }: Props) {
       setTravelError(e instanceof Error ? e.message : 'Travel mode update failed');
     }
     setTravelLoading(false);
+  };
+
+  const dismissAutofillCoach = () => {
+    setAutofillCoach(false);
+    try {
+      window.localStorage.setItem('genvault_autofill_coach_seen', '1');
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const handleAutofillToggle = async (enabled: boolean) => {
+    setAutofillError('');
+    setAutofillLoading(true);
+    try {
+      await api.setAutofillEnabled(enabled);
+      setAutofillEnabled(enabled);
+      setSettings((s) => (s ? { ...s, autofill_enabled: enabled } : s));
+      setMsg(enabled ? 'Autofill enabled — set GenVault as system Autofill service' : 'Autofill disabled');
+      if (enabled) {
+        dismissAutofillCoach();
+      }
+    } catch (e) {
+      setAutofillError(e instanceof Error ? e.message : 'Autofill update failed');
+    }
+    setAutofillLoading(false);
+  };
+
+  const openSystemAutofill = async () => {
+    setAutofillError('');
+    try {
+      await api.openAutofillSettings();
+      dismissAutofillCoach();
+    } catch (e) {
+      setAutofillError(e instanceof Error ? e.message : 'Could not open system Autofill settings');
+    }
   };
 
   const handleDuressEnroll = async () => {
@@ -530,6 +579,66 @@ export default function MobileSettings({ onRefresh, onOpenAbout }: Props) {
             </p>
             {travelError && (
               <p className="text-xs text-accent-danger mt-2">{travelError}</p>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="m3-glass p-4 space-y-3">
+        <div className="flex items-start gap-3">
+          <span className="w-10 h-10 rounded-[var(--m3-radius-md)] bg-[color:var(--md-primary-container)] flex items-center justify-center flex-shrink-0">
+            <KeyRound className="w-5 h-5 text-[color:var(--md-on-primary-container)]" />
+          </span>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="m3-title-md">Autofill passwords</p>
+                <p className="text-xs text-[color:var(--md-on-surface-variant)] mt-0.5">
+                  Off by default. Disabled while travel mode is on. Never fills locked vault without unlock.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={autofillEnabled}
+                disabled={autofillLoading || vaultLocked || travelMode}
+                onClick={() => void handleAutofillToggle(!autofillEnabled)}
+                className={cn(
+                  'relative w-12 h-7 rounded-full transition-colors duration-200 flex-shrink-0 disabled:opacity-40',
+                  autofillEnabled ? 'bg-[color:var(--md-primary)]' : 'bg-[color:var(--md-outline)]'
+                )}
+              >
+                <span
+                  className={cn(
+                    'absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white transition-transform duration-200',
+                    autofillEnabled && 'translate-x-5'
+                  )}
+                />
+              </button>
+            </div>
+            {autofillCoach && (
+              <p className="text-[11px] text-[color:var(--md-on-surface-variant)] mt-2 rounded-[var(--m3-radius-sm)] bg-[color:var(--md-surface-container)] px-2 py-1.5">
+                Enable the toggle, then choose GenVault in system Autofill settings so other apps can request credentials.
+                <button type="button" className="ml-2 underline" onClick={dismissAutofillCoach}>
+                  Got it
+                </button>
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => void openSystemAutofill()}
+              className="mt-3 min-h-[44px] w-full rounded-[var(--m3-radius-md)] bg-[color:var(--md-surface-container)] text-[color:var(--md-on-surface)] text-sm font-medium flex items-center justify-center gap-2"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Open system Autofill settings
+            </button>
+            {travelMode && (
+              <p className="text-[11px] text-[color:var(--md-on-surface-variant)] mt-2">
+                Travel mode blocks Autofill until disabled.
+              </p>
+            )}
+            {autofillError && (
+              <p className="text-xs text-accent-danger mt-2">{autofillError}</p>
             )}
           </div>
         </div>

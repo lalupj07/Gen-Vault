@@ -113,6 +113,22 @@ export interface AppSettings {
   ui_font?: string;
   hibp_audit_enabled?: boolean;
   travel_mode?: boolean;
+  /** Android Autofill — off by default. */
+  autofill_enabled?: boolean;
+}
+
+export interface AutofillCandidate {
+  id: string;
+  title: string;
+  username_hint: string;
+  has_otp: boolean;
+  has_password: boolean;
+}
+
+export interface AutofillFillPayload {
+  username?: string | null;
+  password?: string | null;
+  otp?: string | null;
 }
 
 export interface OtpCode {
@@ -314,6 +330,12 @@ export const api = {
   getSecurityScore: () => invoke<number>('get_security_score'),
   getSettings: () => invoke<AppSettings>('get_settings'),
   updateSettings: (settings: AppSettings) => invoke<void>('update_settings', { settings }),
+  getAutofillEnabled: () => invoke<boolean>('get_autofill_enabled'),
+  setAutofillEnabled: (enabled: boolean) => invoke<void>('set_autofill_enabled', { enabled }),
+  openAutofillSettings: () => invoke<void>('open_autofill_settings'),
+  autofillSearch: (query: string, packageName?: string | null) =>
+    invoke<AutofillCandidate[]>('autofill_search', { query, packageName: packageName ?? null }),
+  autofillFill: (entryId: string) => invoke<AutofillFillPayload>('autofill_fill', { entryId }),
 
   rotateVaultKey: (password: string, pin?: string) =>
     invoke<void>('rotate_vault_key', { password, pin: pin ?? null }),

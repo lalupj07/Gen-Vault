@@ -1,6 +1,7 @@
 mod app_paths;
 #[cfg(target_os = "android")]
 mod android_keystore;
+mod android_autofill;
 mod attachments;
 pub mod commands;
 pub mod crypto;
@@ -38,6 +39,8 @@ pub fn run() {
     let builder = builder.plugin(tauri_plugin_biometric::init());
     #[cfg(target_os = "android")]
     let builder = builder.plugin(android_keystore::init());
+    #[cfg(target_os = "android")]
+    let builder = builder.plugin(android_autofill::init());
     builder
         .setup(|app| {
             #[cfg(target_os = "android")]
@@ -96,6 +99,11 @@ pub fn run() {
             panic_lock,
             get_travel_mode,
             set_travel_mode,
+            autofill_search,
+            autofill_fill,
+            get_autofill_enabled,
+            set_autofill_enabled,
+            open_autofill_settings,
             setup_master_password_from_legacy,
             complete_onboarding,
             update_user,

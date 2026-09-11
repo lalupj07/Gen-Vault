@@ -158,6 +158,9 @@ pub struct AppSettings {
     /// Temporary lockdown for travel / shared spaces (Phase 1 privacy).
     #[serde(default)]
     pub travel_mode: bool,
+    /// Android Autofill (off by default; synced to SharedPreferences for the service).
+    #[serde(default)]
+    pub autofill_enabled: bool,
 }
 
 fn default_true() -> bool {
@@ -187,6 +190,7 @@ impl Default for AppSettings {
             ui_font: default_ui_font(),
             hibp_audit_enabled: false,
             travel_mode: false,
+            autofill_enabled: false,
         }
     }
 }

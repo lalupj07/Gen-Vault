@@ -7,6 +7,7 @@ use crate::models::{VaultData, VaultEntry, VaultEntryPublic};
 use crate::store;
 
 pub mod auth;
+pub mod autofill;
 pub mod file_lock;
 pub mod folder_lock;
 pub mod media_vault;
@@ -16,6 +17,7 @@ pub mod recovery;
 pub mod vault;
 
 pub use auth::*;
+pub use autofill::*;
 pub use file_lock::*;
 pub use folder_lock::*;
 pub use media_vault::*;
