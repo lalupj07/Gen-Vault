@@ -1,11 +1,12 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Search, Star } from 'lucide-react';
+import { Search, Star, KeyRound } from 'lucide-react';
 import type { VaultEntry } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n';
 import { M3Chip, M3ChipRow } from './m3';
+import { IssuerAvatar } from './IssuerAvatar';
 
 type Filter = 'all' | 'favorites' | 'totp' | 'other';
 
@@ -14,9 +15,12 @@ interface Props {
   loading: boolean;
   onOpenEntry: (id: string) => void;
   onRefresh: () => void;
+  onAddPassword?: () => void;
 }
 
-export default function MobileVaultList({ entries, loading, onOpenEntry }: Props) {
+export default function MobileVaultList({
+  entries, loading, onOpenEntry, onAddPassword,
+}: Props) {
   const { t } = useI18n();
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
@@ -52,6 +56,8 @@ export default function MobileVaultList({ entries, loading, onOpenEntry }: Props
     { id: 'totp', label: t('mobile.vault.filter.totp') },
     { id: 'other', label: t('mobile.vault.filter.other') },
   ];
+
+  const trulyEmpty = entries.length === 0;
 
   return (
     <div className="space-y-4 pt-2 pb-4">
@@ -96,7 +102,24 @@ export default function MobileVaultList({ entries, loading, onOpenEntry }: Props
           ))}
         </ul>
       ) : filtered.length === 0 ? (
-        <p className="text-sm text-[color:var(--md-on-surface-variant)] py-8 text-center">{t('mobile.vault.empty')}</p>
+        trulyEmpty ? (
+          <div className="m3-glass px-4 py-10 text-center border-dashed">
+            <KeyRound
+              className="w-10 h-10 mx-auto mb-3 text-[color:var(--md-on-surface-variant)] opacity-40"
+              aria-hidden
+            />
+            <p className="text-sm font-medium text-[color:var(--md-on-surface)]">No passwords yet</p>
+            <button
+              type="button"
+              onClick={onAddPassword}
+              className="mt-4 w-full min-h-[48px] m3-fab !w-full !h-auto !rounded-[var(--m3-radius-lg)] font-semibold"
+            >
+              Add password
+            </button>
+          </div>
+        ) : (
+          <p className="text-sm text-[color:var(--md-on-surface-variant)] py-8 text-center">{t('mobile.vault.empty')}</p>
+        )
       ) : (
         <ul className="m3-glass divide-y divide-[color:var(--md-outline-variant)] overflow-hidden p-0">
           {filtered.map((e) => (
@@ -107,15 +130,18 @@ export default function MobileVaultList({ entries, loading, onOpenEntry }: Props
                 className="w-full text-left px-4 py-3.5 min-h-[72px] hover:bg-[color-mix(in_srgb,var(--md-primary)_6%,transparent)] transition-colors duration-200"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[11px] text-[color:var(--md-on-surface-variant)] truncate">{e.issuer || e.category || 'Entry'}</p>
-                    <p className="m3-title-md truncate mt-0.5">{e.name}</p>
-                    <p className="text-xs text-[color:var(--md-on-primary-container)] mt-1.5 truncate">
-                      {e.period > 0
-                        ? `${e.digits}-digit ${e.is_hotp ? 'HOTP' : 'TOTP'} · ${e.period || 30}s`
-                        : t('mobile.vault.credential')}
-                      {(e.tags?.length ?? 0) > 0 ? ` · ${e.tags!.slice(0, 3).join(', ')}` : ''}
-                    </p>
+                  <div className="flex items-start gap-3 min-w-0">
+                    <IssuerAvatar issuer={e.issuer || e.name} />
+                    <div className="min-w-0">
+                      <p className="text-[11px] text-[color:var(--md-on-surface-variant)] truncate">{e.issuer || e.category || 'Entry'}</p>
+                      <p className="m3-title-md truncate mt-0.5">{e.name}</p>
+                      <p className="text-xs text-[color:var(--md-on-primary-container)] mt-1.5 truncate">
+                        {e.period > 0
+                          ? `${e.digits}-digit ${e.is_hotp ? 'HOTP' : 'TOTP'} · ${e.period || 30}s`
+                          : t('mobile.vault.credential')}
+                        {(e.tags?.length ?? 0) > 0 ? ` · ${e.tags!.slice(0, 3).join(', ')}` : ''}
+                      </p>
+                    </div>
                   </div>
                   <div className="flex flex-col items-end gap-2 flex-shrink-0">
                     {e.favorite && <Star className="w-4 h-4 text-accent-warning fill-accent-warning" />}

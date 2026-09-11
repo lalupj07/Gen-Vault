@@ -6,8 +6,9 @@ import {
 } from 'react';
 import { AnimatePresence, motion, useReducedMotion, type Transition } from 'framer-motion';
 import {
-  Home, Lock, LayoutDashboard, KeyRound, Vault,
+  Lock, LayoutDashboard, KeyRound, Vault, Trash2,
   Smartphone, QrCode, Grid3X3, Sun, Moon, Wrench, ChevronLeft, Info, User, ShieldAlert,
+  PenLine,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
@@ -24,6 +25,7 @@ import MobileProfile from './MobileProfile';
 import MobileVaultList from './MobileVaultList';
 import MobileCodes from './MobileCodes';
 import MobileEntryDetail from './MobileEntryDetail';
+import MobileTrash from './MobileTrash';
 import {
   MobileToolsHub,
   MobileToolView,
@@ -33,8 +35,9 @@ import {
 import { backupReminderDue, backupReminderLabel } from '@/lib/backup-reminder';
 import { M3NavBar, M3Fab } from './m3';
 
-type MobileTab = 'home' | 'codes' | 'vault' | 'tools' | 'more';
+type MobileTab = 'codes' | 'vault' | 'tools' | 'more';
 type MobileStack = 'tabs' | 'feature' | 'add' | 'tool' | 'detail';
+type AddIntent = { kind: 'totp' | 'password'; scan?: boolean };
 
 interface NavState {
   stack: MobileStack;
@@ -49,11 +52,13 @@ const SPRING_SOFT: Transition = { type: 'spring', stiffness: 320, damping: 34, m
 const EDGE_START = 52;
 const COMMIT_RATIO = 0.28;
 const COMMIT_VELOCITY = 650;
+const UNDO_MS = 10_000;
 
 const MORE_ITEMS: { id: string; label: string; icon: typeof LayoutDashboard; section: string }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'Overview' },
   { id: 'quick-tools', label: 'Quick tools', icon: Wrench, section: 'Overview' },
   { id: 'qr-onboard', label: 'QR onboard', icon: QrCode, section: 'Overview' },
+  { id: 'trash', label: 'Trash', icon: Trash2, section: 'Overview' },
   { id: 'profile', label: 'Profile', icon: User, section: 'System' },
   { id: 'mobile-settings', label: 'Android & backup', icon: Smartphone, section: 'System' },
   { id: 'about', label: 'About & legal', icon: Info, section: 'System' },
@@ -61,7 +66,7 @@ const MORE_ITEMS: { id: string; label: string; icon: typeof LayoutDashboard; sec
 
 const ROOT_NAV: NavState = {
   stack: 'tabs',
-  tab: 'home',
+  tab: 'codes',
   featureView: 'dashboard',
   toolId: 'generator',
   entryId: null,
@@ -91,12 +96,18 @@ export default function MobileShell() {
   const [dragX, setDragX] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [navDir, setNavDir] = useState<1 | -1>(1);
+  const [addIntent, setAddIntent] = useState<AddIntent>({ kind: 'totp', scan: true });
+  const [fabMenu, setFabMenu] = useState(false);
+  const [undoTrash, setUndoTrash] = useState<{ id: string; name: string } | null>(null);
 
   /** In-app stack — never rely on WebView history (Android exits when canGoBack is false). */
   const framesRef = useRef<NavState[]>([ROOT_NAV]);
   const navRef = useRef(nav);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const goBackRef = useRef<() => boolean>(() => false);
+  const undoTimerRef = useRef<number | null>(null);
+  const fabLongRef = useRef<number | null>(null);
+  const fabDidLongRef = useRef(false);
   const swipe = useRef<{
     x0: number;
     y0: number;
@@ -199,11 +210,16 @@ export default function MobileShell() {
     }
 
     // Root tab — do not exit; Android MainActivity will finish only if we return false
-    // Returning false allows leaving the app from the home tab via system back.
+    // Returning false allows leaving the app from Codes (root) via system back.
     return false;
   }, []);
 
   goBackRef.current = goBack;
+
+  useEffect(() => () => {
+    if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
+    if (fabLongRef.current) window.clearTimeout(fabLongRef.current);
+  }, []);
 
   useEffect(() => {
     window.__genvaultBack = () => goBackRef.current();
@@ -293,7 +309,9 @@ export default function MobileShell() {
     }
   }, [canNavigateBack, dragX, goBack, reduceMotion]);
 
-  const openAdd = () => {
+  const openAdd = (intent: AddIntent = { kind: 'totp', scan: true }) => {
+    setFabMenu(false);
+    setAddIntent(intent);
     pushNav({ stack: 'add', tab, featureView, toolId, entryId: null });
   };
 
@@ -306,15 +324,37 @@ export default function MobileShell() {
   };
 
   const openFeature = (id: string) => {
-    if (id === 'dashboard') {
-      replaceNav({ stack: 'tabs', tab: 'home', featureView, toolId, entryId: null });
-      return;
-    }
     if (id === 'quick-tools') {
       replaceNav({ stack: 'tabs', tab: 'tools', featureView, toolId, entryId: null });
       return;
     }
     pushNav({ stack: 'feature', tab: 'more', featureView: id, toolId, entryId: null });
+  };
+
+  const offerUndoTrash = (info: { id: string; name: string }) => {
+    setUndoTrash(info);
+    if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
+    undoTimerRef.current = window.setTimeout(() => setUndoTrash(null), UNDO_MS);
+  };
+
+  const undoSoftDelete = async () => {
+    if (!undoTrash) return;
+    const id = undoTrash.id;
+    setUndoTrash(null);
+    if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
+    try {
+      await api.restoreVaultEntry(id);
+      await refresh();
+    } catch {
+      /* keep UI calm; entry remains in trash */
+    }
+  };
+
+  const clearFabLong = () => {
+    if (fabLongRef.current) {
+      window.clearTimeout(fabLongRef.current);
+      fabLongRef.current = null;
+    }
   };
 
   const setTab = (next: MobileTab) => {
@@ -492,35 +532,32 @@ export default function MobileShell() {
 
         {showBackupNudge && stack === 'tabs' && (
           <motion.div
-            className="mb-3 m3-glass px-3 py-3 flex flex-col gap-2"
+            className="mb-3 m3-glass px-3 py-2 flex items-center gap-2"
             initial={reduceMotion ? false : { opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={SPRING_SOFT}
+            role="status"
           >
-            <p className="text-xs text-[color:var(--md-on-surface)]">
+            <button
+              type="button"
+              className="flex-1 min-h-[48px] text-left text-xs text-[color:var(--md-on-surface)]"
+              onClick={() => {
+                setShowBackupNudge(false);
+                openFeature('mobile-settings');
+              }}
+            >
               <span className="text-[color:var(--md-primary)] font-medium">{t('mobile.backup.reminder')}</span>
               {' · '}
               {backupReminderLabel()}
-            </p>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                className="flex-1 min-h-[36px] rounded-xl m3-fab !w-auto !h-auto text-xs font-semibold px-3"
-                onClick={() => {
-                  setShowBackupNudge(false);
-                  openFeature('mobile-settings');
-                }}
-              >
-                {t('mobile.backup.now')}
-              </button>
-              <button
-                type="button"
-                className="min-h-[36px] px-3 rounded-xl text-xs text-[color:var(--md-on-surface-variant)] border border-[color:var(--md-outline)]"
-                onClick={() => setShowBackupNudge(false)}
-              >
-                {t('common.later')}
-              </button>
-            </div>
+            </button>
+            <button
+              type="button"
+              className="min-h-[48px] min-w-[48px] rounded-full text-sm text-[color:var(--md-on-surface-variant)]"
+              onClick={() => setShowBackupNudge(false)}
+              aria-label={t('common.later')}
+            >
+              ×
+            </button>
           </motion.div>
         )}
 
@@ -536,6 +573,8 @@ export default function MobileShell() {
           >
             {stack === 'add' ? (
               <MobileAddEntry
+                initialKind={addIntent.kind}
+                autoScan={!!addIntent.scan}
                 onBack={goBack}
                 onSaved={async (savedId) => {
                   await refresh();
@@ -551,7 +590,7 @@ export default function MobileShell() {
                   }
                   resetTo({
                     stack: 'tabs',
-                    tab: 'codes',
+                    tab: addIntent.kind === 'password' ? 'vault' : 'codes',
                     featureView,
                     toolId,
                     entryId: null,
@@ -562,7 +601,8 @@ export default function MobileShell() {
               <MobileEntryDetail
                 entry={selected}
                 onBack={goBack}
-                onDeleted={async () => {
+                onDeleted={async (info) => {
+                  offerUndoTrash(info);
                   await refresh();
                   goBack();
                 }}
@@ -574,22 +614,13 @@ export default function MobileShell() {
               renderFeature(featureView, appState, visibleEntries, refresh, openFeature)
             ) : (
               <>
-                {tab === 'home' && (
-                  loading ? (
-                    <div className="space-y-3 pt-4" aria-busy="true">
-                      <div className="h-28 rounded-3xl m3-glass animate-pulse" />
-                      <div className="h-16 rounded-2xl m3-glass animate-pulse" />
-                      <div className="h-16 rounded-2xl m3-glass animate-pulse" />
-                    </div>
-                  ) : (
-                    <Dashboard appState={appState} vaultEntries={visibleEntries as never} />
-                  )
-                )}
                 {tab === 'codes' && (
                   <MobileCodes
                     entries={visibleEntries}
                     loading={loading}
                     onOpenEntry={openEntry}
+                    onScanQr={() => openAdd({ kind: 'totp', scan: true })}
+                    onManual={() => openAdd({ kind: 'totp', scan: false })}
                   />
                 )}
                 {tab === 'vault' && (
@@ -598,6 +629,7 @@ export default function MobileShell() {
                     loading={loading}
                     onOpenEntry={openEntry}
                     onRefresh={refresh}
+                    onAddPassword={() => openAdd({ kind: 'password' })}
                   />
                 )}
                 {tab === 'tools' && <MobileToolsHub onOpen={openTool} />}
@@ -629,12 +661,6 @@ export default function MobileShell() {
           >
             <M3NavBar aria-label="Primary">
               <NavBtn
-                label={t('mobile.tab.home')}
-                active={tab === 'home'}
-                onClick={() => setTab('home')}
-                icon={<Home className="w-5 h-5" />}
-              />
-              <NavBtn
                 label={t('mobile.tab.codes')}
                 active={tab === 'codes'}
                 onClick={() => setTab('codes')}
@@ -655,13 +681,103 @@ export default function MobileShell() {
               />
 
               <M3Fab
-                onClick={openAdd}
+                onClick={() => {
+                  if (fabDidLongRef.current) {
+                    fabDidLongRef.current = false;
+                    return;
+                  }
+                  openAdd({ kind: 'totp', scan: true });
+                }}
+                onPointerDown={() => {
+                  fabDidLongRef.current = false;
+                  clearFabLong();
+                  fabLongRef.current = window.setTimeout(() => {
+                    fabDidLongRef.current = true;
+                    setFabMenu(true);
+                  }, 450);
+                }}
+                onPointerUp={clearFabLong}
+                onPointerLeave={clearFabLong}
+                onPointerCancel={clearFabLong}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  fabDidLongRef.current = true;
+                  setFabMenu(true);
+                }}
                 className="absolute left-1/2 -translate-x-1/2 -top-5 m3-fab-bounce m3-fab-seal"
                 aria-label={t('mobile.add')}
+                aria-haspopup="menu"
+                aria-expanded={fabMenu}
               >
                 <VaultSealIcon />
               </M3Fab>
             </M3NavBar>
+
+            <AnimatePresence>
+              {fabMenu && (
+                <motion.div
+                  key="fab-menu"
+                  className="absolute left-1/2 -translate-x-1/2 bottom-[4.75rem] z-40 w-[min(100%,16rem)] m3-glass p-2 space-y-1"
+                  initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 6 }}
+                  transition={SPRING_SOFT}
+                  role="menu"
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="w-full min-h-[48px] px-3 rounded-[var(--m3-radius-md)] text-sm font-medium text-left flex items-center gap-2 text-[color:var(--md-on-surface)] hover:bg-[color-mix(in_srgb,var(--md-primary)_8%,transparent)]"
+                    onClick={() => openAdd({ kind: 'password' })}
+                  >
+                    <KeyRound className="w-4 h-4" aria-hidden />
+                    Add password
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="w-full min-h-[48px] px-3 rounded-[var(--m3-radius-md)] text-sm font-medium text-left flex items-center gap-2 text-[color:var(--md-on-surface)] hover:bg-[color-mix(in_srgb,var(--md-primary)_8%,transparent)]"
+                    onClick={() => openAdd({ kind: 'totp', scan: false })}
+                  >
+                    <PenLine className="w-4 h-4" aria-hidden />
+                    Manual secret
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full min-h-[40px] text-xs text-[color:var(--md-on-surface-variant)]"
+                    onClick={() => setFabMenu(false)}
+                  >
+                    Cancel
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {undoTrash && (
+          <motion.div
+            key="undo-snack"
+            className="absolute left-4 right-4 z-40 flex items-center gap-3 m3-glass px-4 py-3"
+            style={{ bottom: 'calc(5.5rem + env(safe-area-inset-bottom))' }}
+            initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            transition={SPRING_SOFT}
+            role="status"
+          >
+            <p className="flex-1 text-sm text-[color:var(--md-on-surface)] truncate">
+              Moved to trash
+            </p>
+            <button
+              type="button"
+              className="min-h-[48px] px-3 text-sm font-semibold text-[color:var(--md-primary)]"
+              onClick={() => void undoSoftDelete()}
+            >
+              Undo
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -702,6 +818,8 @@ function renderFeature(
       return <MobileSettings onRefresh={refresh} onOpenAbout={() => goFeature('about')} />;
     case 'about':
       return <MobileAbout />;
+    case 'trash':
+      return <MobileTrash onChanged={refresh} />;
     default:
       return <Dashboard appState={appState} vaultEntries={entries as never} />;
   }

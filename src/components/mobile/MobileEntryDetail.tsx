@@ -11,7 +11,8 @@ import { vibrateOnOtpExpiry } from '@/lib/time-sync';
 interface Props {
   entry: VaultEntry;
   onBack: () => void;
-  onDeleted: () => void;
+  /** Soft-deleted; parent should refresh + show Undo snackbar. */
+  onDeleted: (info: { id: string; name: string }) => void;
   onUpdated?: () => void;
 }
 
@@ -126,11 +127,11 @@ export default function MobileEntryDetail({ entry, onBack, onDeleted, onUpdated 
   };
 
   const handleDelete = async () => {
-    if (!window.confirm(`Delete “${entry.name}”? This cannot be undone.`)) return;
+    if (!window.confirm(`Move “${entry.name}” to trash? You can restore it within 30 days.`)) return;
     setDeleting(true);
     try {
-      await api.removeVaultEntry(entry.id);
-      onDeleted();
+      await api.softDeleteVaultEntry(entry.id);
+      onDeleted({ id: entry.id, name: entry.name });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Delete failed');
       setDeleting(false);
@@ -328,7 +329,7 @@ export default function MobileEntryDetail({ entry, onBack, onDeleted, onUpdated 
         className="w-full min-h-[48px] rounded-[var(--m3-radius-lg)] border border-[color:var(--md-error)]/30 text-[color:var(--md-error)] flex items-center justify-center gap-2 hover:bg-[color:var(--md-error)]/10 transition-colors duration-200 disabled:opacity-50"
       >
         <Trash2 className="w-4 h-4" />
-        {deleting ? 'Deleting…' : 'Delete entry'}
+        {deleting ? 'Moving to trash…' : 'Move to trash'}
       </button>
     </div>
   );

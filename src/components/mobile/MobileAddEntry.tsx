@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowLeft, QrCode } from 'lucide-react';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -12,13 +12,18 @@ import { M3Section } from './m3';
 interface Props {
   onBack: () => void;
   onSaved: (entryId?: string) => void;
+  initialKind?: 'totp' | 'password';
+  /** Open QR scanner immediately (scan-first FAB / empty state). */
+  autoScan?: boolean;
 }
 
 type Kind = 'totp' | 'password';
 
-export default function MobileAddEntry({ onBack, onSaved }: Props) {
+export default function MobileAddEntry({
+  onBack, onSaved, initialKind = 'totp', autoScan = false,
+}: Props) {
   const { t } = useI18n();
-  const [kind, setKind] = useState<Kind>('totp');
+  const [kind, setKind] = useState<Kind>(initialKind);
   const [name, setName] = useState('');
   const [issuer, setIssuer] = useState('');
   const [secret, setSecret] = useState('');
@@ -29,6 +34,12 @@ export default function MobileAddEntry({ onBack, onSaved }: Props) {
   const [error, setError] = useState('');
   const [showSecret, setShowSecret] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
+
+  useEffect(() => {
+    if (autoScan && initialKind === 'totp') setShowScanner(true);
+    // Intent is fixed for this mount of the add stack frame.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const importFromUri = async (uri: string) => {
     setError('');
