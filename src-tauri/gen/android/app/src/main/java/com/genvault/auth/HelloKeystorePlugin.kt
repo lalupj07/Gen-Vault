@@ -1,4 +1,4 @@
-package com.genxis.genvault
+package com.genvault.auth
 
 import android.app.Activity
 import android.os.Build

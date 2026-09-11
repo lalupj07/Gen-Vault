@@ -1,4 +1,4 @@
-package com.genxis.genvault
+package com.genvault.auth
 
 import android.os.Bundle
 import android.view.View
@@ -7,15 +7,18 @@ import android.view.WindowManager
 import android.webkit.WebView
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
+import com.genvault.auth.BuildConfig
 
 class MainActivity : TauriActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
-    // Block screenshots and recent-task previews of vault UI
-    window.setFlags(
-      WindowManager.LayoutParams.FLAG_SECURE,
-      WindowManager.LayoutParams.FLAG_SECURE
-    )
+    // Block screenshots in release; debug builds allow Play listing captures
+    if (!BuildConfig.DEBUG) {
+      window.setFlags(
+        WindowManager.LayoutParams.FLAG_SECURE,
+        WindowManager.LayoutParams.FLAG_SECURE
+      )
+    }
     super.onCreate(savedInstanceState)
 
     // Ask the SPA to handle back first. WebView.canGoBack() is unreliable for pushState.

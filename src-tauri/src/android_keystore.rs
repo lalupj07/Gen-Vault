@@ -15,7 +15,7 @@ use tauri::{
 use tauri_plugin_biometric::BiometricExt;
 
 #[cfg(target_os = "android")]
-const PLUGIN_PKG: &str = "com.genxis.genvault";
+const PLUGIN_PKG: &str = "com.genvault.auth";
 #[cfg(target_os = "android")]
 const PLUGIN_CLASS: &str = "HelloKeystorePlugin";
 
