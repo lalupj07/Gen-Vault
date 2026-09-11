@@ -71,9 +71,13 @@ Google Play requires **`versionCode` to increase monotonically** on every upload
 
 **Rule of thumb:** Every Play upload gets a new, higher `versionCode`. Never reuse a `versionCode` already accepted by Play.
 
-## 6. Local upload key location (this machine)
+## 6. Example local layout (outside the repo)
 
-Upload keystore lives **outside** the repo (default): `%USERPROFILE%\.genvault\genvault-upload.jks`  
-Credentials file (back up, then prefer password manager): `%USERPROFILE%\.genvault\upload-credentials.txt`
+Keep the upload keystore and passwords **outside** the repo. Example layout:
+
+- Keystore: `%USERPROFILE%\.genvault\genvault-upload.jks`
+- Credentials notes (prefer a password manager): `%USERPROFILE%\.genvault\upload-credentials.txt`
+
+Point `storeFile` in your local `keystore.properties` at that path. Never commit `.jks` files, real `keystore.properties`, or credential notes.
 
 Register the upload certificate SHA-256 in Play Console → App signing when enrolling Play App Signing.

@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.genvault.auth",
+      "sha256_cert_fingerprints": [
+        "11:66:39:A1:72:25:6F:CD:68:BB:E8:02:51:1B:EA:A3:EC:B2:6A:8C:DD:C7:A3:FE:AA:EA:26:6E:A1:B6:D0:03"
+      ]
+    }
+  }
+]
