@@ -348,6 +348,7 @@ export const api = {
   importOtpauthUri: (uri: string, category: string) => invoke<VaultEntry>('import_otpauth_uri', { uri, category }),
   importGoogleAuthenticator: (json: string, category: string) => invoke<VaultEntry[]>('import_google_authenticator', { json, category }),
   importAuthyCsv: (csv: string, category: string) => invoke<VaultEntry[]>('import_authy_csv', { csv, category }),
+  importAegisJson: (json: string, category: string) => invoke<VaultEntry[]>('import_aegis_json', { json, category }),
   importManualEntry: (name: string, issuer: string, secret: string, category: string, digits?: number, period?: number) =>
     invoke<VaultEntry>('import_manual_entry', { name, issuer, secret, category, digits, period }),
 

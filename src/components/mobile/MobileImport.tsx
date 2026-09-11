@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { analyzeOtpauthUri, otpauthBlocked } from '@/lib/otpauth-safety';
@@ -9,7 +9,19 @@ interface Props {
   onImported?: () => void;
 }
 
-type Mode = 'otpauth' | 'google' | 'authy';
+type Mode = 'otpauth' | 'google' | 'authy' | 'aegis';
+
+function countAegisTotp(json: string): number {
+  const parsed = JSON.parse(json) as { db?: { entries?: Array<{ type?: string }> } | string };
+  if (typeof parsed.db === 'string') {
+    throw new Error('Encrypted Aegis vault — export as plain JSON from Aegis first');
+  }
+  const entries = parsed.db?.entries;
+  if (!Array.isArray(entries)) {
+    throw new Error('Invalid Aegis JSON: missing db.entries');
+  }
+  return entries.filter((e) => (e.type || '').toLowerCase() === 'totp').length;
+}
 
 export default function MobileImport({ onImported }: Props) {
   const [mode, setMode] = useState<Mode>('otpauth');
@@ -19,6 +31,9 @@ export default function MobileImport({ onImported }: Props) {
   const [err, setErr] = useState('');
   const [ok, setOk] = useState('');
   const [ackPhish, setAckPhish] = useState(false);
+  const [aegisPreview, setAegisPreview] = useState<number | null>(null);
+  const [aegisFileName, setAegisFileName] = useState('');
+  const aegisInputRef = useRef<HTMLInputElement>(null);
 
   const warnings = useMemo(
     () => (mode === 'otpauth' && payload.trim() ? analyzeOtpauthUri(payload) : []),
@@ -27,9 +42,60 @@ export default function MobileImport({ onImported }: Props) {
   const blocked = mode === 'otpauth' && otpauthBlocked(warnings);
   const hasWarn = warnings.some((w) => w.level === 'warn');
 
+  const resetAegis = () => {
+    setAegisPreview(null);
+    setAegisFileName('');
+    setPayload('');
+    if (aegisInputRef.current) aegisInputRef.current.value = '';
+  };
+
+  const onAegisFile = async (file: File | undefined) => {
+    setErr('');
+    setOk('');
+    setAegisPreview(null);
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const count = countAegisTotp(text);
+      setPayload(text);
+      setAegisFileName(file.name);
+      setAegisPreview(count);
+    } catch (e) {
+      setPayload('');
+      setAegisFileName('');
+      setErr(e instanceof Error ? e.message : 'Could not read Aegis JSON');
+    }
+  };
+
   const run = async () => {
     setErr('');
     setOk('');
+    if (mode === 'aegis') {
+      if (!payload.trim() || aegisPreview === null) {
+        setErr('Choose an Aegis JSON file first');
+        return;
+      }
+      if (aegisPreview === 0) {
+        setErr('No TOTP entries found in this file');
+        return;
+      }
+      setBusy(true);
+      try {
+        const cat = category.trim() || 'Imported';
+        const list = await api.importAegisJson(payload, cat);
+        setOk(
+          `Imported ${list.length} Aegis entr${list.length === 1 ? 'y' : 'ies'}` +
+            (list.length < aegisPreview ? ` (${aegisPreview - list.length} duplicate${aegisPreview - list.length === 1 ? '' : 's'} skipped)` : ''),
+        );
+        resetAegis();
+        onImported?.();
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : 'Import failed');
+      }
+      setBusy(false);
+      return;
+    }
+
     if (!payload.trim()) {
       setErr('Paste import data first');
       return;
@@ -67,21 +133,28 @@ export default function MobileImport({ onImported }: Props) {
   return (
     <div className="space-y-4">
       <p className="text-xs text-vault-muted">
-        Import offline from otpauth URIs, Google Authenticator export JSON, or Authy CSV. Secrets stay on device.
+        Import offline from otpauth URIs, Google Authenticator, Authy CSV, or Aegis plain JSON. Secrets stay on device.
       </p>
 
-      <div className="flex gap-1 p-1 rounded-2xl bg-vault-black border border-vault-border">
+      <div className="flex flex-wrap gap-1 p-1 rounded-2xl bg-vault-black border border-vault-border">
         {([
           ['otpauth', 'otpauth'],
           ['google', 'Google'],
           ['authy', 'Authy'],
+          ['aegis', 'Aegis'],
         ] as const).map(([id, label]) => (
           <button
             key={id}
             type="button"
-            onClick={() => { setMode(id); setAckPhish(false); setErr(''); setOk(''); }}
+            onClick={() => {
+              setMode(id);
+              setAckPhish(false);
+              setErr('');
+              setOk('');
+              if (id !== 'aegis') resetAegis();
+            }}
             className={cn(
-              'flex-1 min-h-[40px] rounded-xl text-xs font-medium transition-colors',
+              'flex-1 min-w-[4.5rem] min-h-[40px] rounded-xl text-xs font-medium transition-colors',
               mode === id ? 'bg-cyber-cyan text-black' : 'text-vault-muted',
             )}
           >
@@ -97,19 +170,43 @@ export default function MobileImport({ onImported }: Props) {
         className="w-full min-h-[44px] px-3 rounded-xl bg-vault-black border border-vault-border text-sm text-vault-light"
       />
 
-      <textarea
-        value={payload}
-        onChange={(e) => { setPayload(e.target.value); setAckPhish(false); }}
-        rows={5}
-        placeholder={
-          mode === 'otpauth'
-            ? 'otpauth://totp/…'
-            : mode === 'google'
-              ? 'Paste Google Authenticator export JSON'
-              : 'Paste Authy CSV'
-        }
-        className="w-full px-3 py-3 rounded-xl bg-vault-black border border-vault-border text-xs font-mono text-vault-light resize-y min-h-[120px]"
-      />
+      {mode === 'aegis' ? (
+        <div className="space-y-3">
+          <label className="flex items-center justify-center w-full min-h-[48px] rounded-2xl border border-dashed border-vault-border text-xs text-vault-muted cursor-pointer hover:border-cyber-cyan/40 hover:text-cyber-cyan">
+            {aegisFileName || 'Choose Aegis JSON file'}
+            <input
+              ref={aegisInputRef}
+              type="file"
+              accept=".json,application/json"
+              className="hidden"
+              onChange={(e) => {
+                void onAegisFile(e.target.files?.[0]);
+                e.target.value = '';
+              }}
+            />
+          </label>
+          {aegisPreview !== null && (
+            <p className="text-xs text-vault-light" role="status">
+              Preview: {aegisPreview} TOTP entr{aegisPreview === 1 ? 'y' : 'ies'} ready to import
+              {aegisFileName ? ` from ${aegisFileName}` : ''}.
+            </p>
+          )}
+        </div>
+      ) : (
+        <textarea
+          value={payload}
+          onChange={(e) => { setPayload(e.target.value); setAckPhish(false); }}
+          rows={5}
+          placeholder={
+            mode === 'otpauth'
+              ? 'otpauth://totp/…'
+              : mode === 'google'
+                ? 'Paste Google Authenticator export JSON'
+                : 'Paste Authy CSV'
+          }
+          className="w-full px-3 py-3 rounded-xl bg-vault-black border border-vault-border text-xs font-mono text-vault-light resize-y min-h-[120px]"
+        />
+      )}
 
       {warnings.length > 0 && (
         <ul className="space-y-1.5" role="status">
@@ -143,11 +240,17 @@ export default function MobileImport({ onImported }: Props) {
 
       <button
         type="button"
-        disabled={busy || blocked}
+        disabled={busy || blocked || (mode === 'aegis' && aegisPreview === null)}
         onClick={run}
         className="w-full min-h-[48px] rounded-2xl bg-cyber-cyan text-black text-sm font-semibold disabled:opacity-50"
       >
-        {busy ? 'Importing…' : 'Import'}
+        {busy
+          ? 'Importing…'
+          : mode === 'aegis' && aegisPreview !== null
+            ? `Confirm import (${aegisPreview})`
+            : mode === 'aegis'
+              ? 'Import Aegis JSON'
+              : 'Import'}
       </button>
 
       {err && <p className="text-xs text-accent-danger">{err}</p>}

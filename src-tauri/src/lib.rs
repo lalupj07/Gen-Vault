@@ -12,7 +12,7 @@ pub mod file_lock;
 pub mod media_vault;
 mod hello;
 mod hibp;
-mod import_export;
+pub mod import_export;
 pub mod models;
 mod password_generator;
 mod rate_limit;
@@ -218,6 +218,7 @@ pub fn run() {
             import_otpauth_uri,
             import_google_authenticator,
             import_authy_csv,
+            import_aegis_json,
             import_manual_entry,
             // Search & Filters
             search_vault_entries,

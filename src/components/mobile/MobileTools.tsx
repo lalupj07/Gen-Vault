@@ -34,7 +34,7 @@ const TOOLS: {
   { id: 'generator', label: 'Password generator', desc: 'Strong passwords + breach check', icon: Wand2 },
   { id: 'health', label: 'Password health', desc: 'Strong, weak, reused, stale', icon: Shield },
   { id: 'audit', label: 'Security audit', desc: 'Scan vault for risks', icon: AlertTriangle },
-  { id: 'import', label: 'Import authenticators', desc: 'otpauth / Google / Authy + phishing check', icon: Download },
+  { id: 'import', label: 'Import authenticators', desc: 'otpauth / Google / Authy / Aegis + phishing check', icon: Download },
   { id: 'timesync', label: 'Time sync checker', desc: 'Verify clock for TOTP', icon: Clock },
   { id: 'templates', label: 'Entry templates', desc: 'Add from common services', icon: LayoutTemplate },
   { id: 'emergency', label: 'Emergency codes', desc: 'One-time vault access codes', icon: Key },

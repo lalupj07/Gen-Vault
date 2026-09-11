@@ -213,6 +213,153 @@ pub fn import_google_authenticator(json: &str, category: &str) -> Result<Vec<Vau
     Ok(entries)
 }
 
+/// Aegis vault export (plain JSON only). See beemdevelopment/Aegis docs/vault.md.
+#[derive(Debug, Deserialize)]
+struct AegisExport {
+    version: u32,
+    db: AegisDbField,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum AegisDbField {
+    Plain(AegisDb),
+    Encrypted(#[allow(dead_code)] String),
+}
+
+#[derive(Debug, Deserialize)]
+struct AegisDb {
+    #[serde(default)]
+    version: Option<u32>,
+    #[serde(default)]
+    entries: Vec<AegisEntry>,
+}
+
+#[derive(Debug, Deserialize)]
+struct AegisEntry {
+    #[serde(rename = "type")]
+    entry_type: String,
+    #[serde(default)]
+    name: String,
+    #[serde(default)]
+    issuer: String,
+    info: AegisOtpInfo,
+}
+
+#[derive(Debug, Deserialize)]
+struct AegisOtpInfo {
+    secret: String,
+    #[serde(default)]
+    digits: Option<u32>,
+    #[serde(default)]
+    period: Option<u32>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    algo: Option<String>,
+}
+
+/// Import TOTP entries from an unencrypted Aegis JSON vault export.
+/// Encrypted exports are rejected; never logs secrets.
+pub fn import_aegis_json(json: &str, category: &str) -> Result<Vec<VaultEntry>, String> {
+    let export: AegisExport = serde_json::from_str(json)
+        .map_err(|_| "Invalid Aegis JSON: expected a vault export object".to_string())?;
+
+    if export.version != 1 {
+        return Err(format!(
+            "Unsupported Aegis vault version {} (only version 1 is supported)",
+            export.version
+        ));
+    }
+
+    let db = match export.db {
+        AegisDbField::Encrypted(_) => {
+            return Err(
+                "Encrypted Aegis vault not supported — export as plain JSON from Aegis first"
+                    .to_string(),
+            );
+        }
+        AegisDbField::Plain(db) => db,
+    };
+
+    if let Some(v) = db.version {
+        if v > 3 {
+            return Err(format!(
+                "Unsupported Aegis database version {} (supported: 1–3)",
+                v
+            ));
+        }
+    }
+
+    let mut entries = Vec::new();
+    for item in db.entries {
+        if !item.entry_type.eq_ignore_ascii_case("totp") {
+            continue;
+        }
+
+        let normalized = item.info.secret.replace([' ', '-'], "").to_uppercase();
+        if normalized.is_empty() {
+            return Err(format!(
+                "Missing secret for Aegis entry '{}'",
+                item.name
+            ));
+        }
+
+        let decoded_secret = base32::decode(
+            base32::Alphabet::Rfc4648 { padding: true },
+            &normalized,
+        )
+        .or_else(|| {
+            base32::decode(
+                base32::Alphabet::Rfc4648 { padding: false },
+                normalized.trim_end_matches('='),
+            )
+        })
+        .ok_or_else(|| format!("Invalid base32 secret for {}", item.name))?;
+
+        let secret_b32 = totp_gen::encode_secret_bytes(&decoded_secret);
+        let digits = item.info.digits.unwrap_or(6);
+        let period = item.info.period.unwrap_or(30);
+        let custom_digits = item.info.digits;
+        let custom_period = item.info.period;
+
+        let issuer = if item.issuer.trim().is_empty() {
+            "Unknown".to_string()
+        } else {
+            item.issuer
+        };
+        let name = if item.name.trim().is_empty() {
+            issuer.clone()
+        } else {
+            item.name
+        };
+
+        entries.push(VaultEntry {
+            id: uuid::Uuid::new_v4().to_string(),
+            name,
+            issuer,
+            secret: secret_b32,
+            category: category.to_string(),
+            icon: "🔐".to_string(),
+            color: "#00e5ff".to_string(),
+            digits,
+            period,
+            created_at: chrono::Utc::now().timestamp(),
+            last_used: 0,
+            tags: Vec::new(),
+            favorite: false,
+            notes: String::new(),
+            custom_period,
+            custom_digits,
+            hotp_counter: None,
+            is_hotp: false,
+            attachments: Vec::new(),
+            deleted_at: None,
+        });
+    }
+
+    Ok(entries)
+}
+
 /// Import from Authy export (CSV format)
 pub fn import_authy_csv(csv: &str, category: &str) -> Result<Vec<VaultEntry>, String> {
     let mut entries = Vec::new();

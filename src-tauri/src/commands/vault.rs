@@ -771,6 +771,45 @@ pub fn import_authy_csv(csv: String, category: String) -> Result<Vec<VaultEntryP
 }
 
 #[tauri::command]
+pub fn import_aegis_json(json: String, category: String) -> Result<Vec<VaultEntryPublic>, String> {
+    ensure_export_allowed()?;
+    let candidates = import_export::import_aegis_json(&json, &category)?;
+    with_vault(|vault| {
+        let mut added = Vec::new();
+        for entry in candidates {
+            let is_dup = vault.vault_entries.iter().any(|existing| {
+                is_active(existing)
+                    && existing
+                        .issuer
+                        .trim()
+                        .eq_ignore_ascii_case(entry.issuer.trim())
+                    && normalize_secret_for_dedup(&existing.secret)
+                        == normalize_secret_for_dedup(&entry.secret)
+            });
+            if is_dup {
+                continue;
+            }
+            added.push(entry_public(&entry));
+            vault.vault_entries.push(entry);
+        }
+        Ok(added)
+    })
+}
+
+/// Normalize TOTP secrets for dedup (spaces/case/padding ignored; compare key bytes).
+fn normalize_secret_for_dedup(secret: &str) -> String {
+    let cleaned = secret.replace([' ', '-'], "").to_uppercase();
+    let unpadded = cleaned.trim_end_matches('=');
+    if let Some(bytes) = base32::decode(
+        base32::Alphabet::Rfc4648 { padding: false },
+        unpadded,
+    ) {
+        return totp_gen::encode_secret_bytes(&bytes);
+    }
+    cleaned
+}
+
+#[tauri::command]
 pub fn import_manual_entry(
     name: String,
     issuer: String,

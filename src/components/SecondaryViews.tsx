@@ -1284,6 +1284,10 @@ export function SettingsView({ onReplayWelcomeTour }: { onReplayWelcomeTour?: ()
   const [importData, setImportData] = useState('');
   const [importError, setImportError] = useState('');
   const [importLoading, setImportLoading] = useState(false);
+  const [aegisPreviewCount, setAegisPreviewCount] = useState<number | null>(null);
+  const [aegisPendingJson, setAegisPendingJson] = useState('');
+  const [aegisFileName, setAegisFileName] = useState('');
+  const aegisFileRef = useRef<HTMLInputElement>(null);
 
   const refreshDuressStatus = useCallback(async () => {
     try {
@@ -1692,6 +1696,59 @@ export function SettingsView({ onReplayWelcomeTour }: { onReplayWelcomeTour?: ()
       setShowImport(false);
     } catch (e) {
       setImportError(e instanceof Error ? e.message : 'Failed to import');
+    }
+    setImportLoading(false);
+  };
+
+  const clearAegisPreview = () => {
+    setAegisPreviewCount(null);
+    setAegisPendingJson('');
+    setAegisFileName('');
+    if (aegisFileRef.current) aegisFileRef.current.value = '';
+  };
+
+  const handleAegisFilePicked = async (file: File | undefined) => {
+    setImportError('');
+    clearAegisPreview();
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text) as { db?: { entries?: Array<{ type?: string }> } | string };
+      if (typeof parsed.db === 'string') {
+        setImportError('Encrypted Aegis vault — export as plain JSON from Aegis first');
+        return;
+      }
+      const entries = parsed.db?.entries;
+      if (!Array.isArray(entries)) {
+        setImportError('Invalid Aegis JSON: missing db.entries');
+        return;
+      }
+      const count = entries.filter((e) => (e.type || '').toLowerCase() === 'totp').length;
+      setAegisPendingJson(text);
+      setAegisFileName(file.name);
+      setAegisPreviewCount(count);
+    } catch (e) {
+      setImportError(e instanceof Error ? e.message : 'Could not read Aegis JSON');
+    }
+  };
+
+  const handleConfirmAegisImport = async () => {
+    if (!aegisPendingJson || aegisPreviewCount === null) {
+      setImportError('Choose an Aegis JSON file first');
+      return;
+    }
+    if (aegisPreviewCount === 0) {
+      setImportError('No TOTP entries found in this file');
+      return;
+    }
+    setImportLoading(true);
+    setImportError('');
+    try {
+      await api.importAegisJson(aegisPendingJson, 'Imported');
+      clearAegisPreview();
+      setShowImport(false);
+    } catch (e) {
+      setImportError(e instanceof Error ? e.message : 'Aegis import failed');
     }
     setImportLoading(false);
   };
@@ -2198,6 +2255,19 @@ export function SettingsView({ onReplayWelcomeTour }: { onReplayWelcomeTour?: ()
               className="px-3 py-1.5 rounded-lg bg-cyber-cyan/10 text-cyber-cyan text-xs border border-cyber-cyan/20">
               {showImport ? 'Hide Import' : 'Import Accounts'}
             </button>
+            <label className="px-3 py-1.5 rounded-lg bg-cyber-emerald/10 text-cyber-emerald text-xs border border-cyber-emerald/20 cursor-pointer">
+              Import Aegis JSON
+              <input
+                ref={aegisFileRef}
+                type="file"
+                accept=".json,application/json"
+                className="hidden"
+                onChange={(e) => {
+                  void handleAegisFilePicked(e.target.files?.[0]);
+                  e.target.value = '';
+                }}
+              />
+            </label>
             <button onClick={handleExportAuthenticator}
               disabled={exportBlocked}
               className="px-3 py-1.5 rounded-lg bg-cyber-purple/10 text-cyber-purple text-xs border border-cyber-purple/20 disabled:opacity-50">
@@ -2230,6 +2300,32 @@ export function SettingsView({ onReplayWelcomeTour }: { onReplayWelcomeTour?: ()
               {exportBlocked ? 'CSV export blocked' : 'Export CSV'}
             </button>
           </div>
+          {aegisPreviewCount !== null && (
+            <div className="space-y-2 p-3 rounded-lg bg-vault-black/40 border border-vault-border/40">
+              <p className="text-xs text-vault-light">
+                Preview: {aegisPreviewCount} TOTP entr{aegisPreviewCount === 1 ? 'y' : 'ies'}
+                {aegisFileName ? ` from ${aegisFileName}` : ''}. Confirm to import (duplicates of active entries are skipped).
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleConfirmAegisImport}
+                  disabled={importLoading}
+                  className="px-3 py-1.5 rounded-lg bg-cyber-emerald/10 text-cyber-emerald text-xs border border-cyber-emerald/20 disabled:opacity-50"
+                >
+                  {importLoading ? 'Importing…' : `Confirm import (${aegisPreviewCount})`}
+                </button>
+                <button
+                  type="button"
+                  onClick={clearAegisPreview}
+                  disabled={importLoading}
+                  className="px-3 py-1.5 rounded-lg bg-white/[0.03] text-vault-muted text-xs border border-vault-border/30"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
           {showImport && (
             <div className="space-y-2">
               <textarea placeholder="Paste otpauth:// URI, Google Authenticator JSON, or manual entry data"
