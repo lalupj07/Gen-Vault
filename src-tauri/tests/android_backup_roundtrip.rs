@@ -39,6 +39,7 @@ fn sample_entry(name: &str) -> VaultEntry {
         hotp_counter: None,
         is_hotp: false,
         attachments: Vec::new(),
+        deleted_at: None,
     }
 }
 

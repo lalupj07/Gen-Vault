@@ -970,6 +970,7 @@ fn build_decoy_vault(username: &str) -> VaultData {
                 hotp_counter: None,
                 is_hotp: false,
                 attachments: Vec::new(),
+                deleted_at: None,
             });
         }
     }
@@ -1149,6 +1150,7 @@ mod tests {
                 hotp_counter: None,
                 is_hotp: false,
                 attachments: vec![],
+                deleted_at: None,
             });
             save_vault_with_key(&real_vault, &real_key).unwrap();
 

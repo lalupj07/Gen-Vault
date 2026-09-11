@@ -158,6 +158,11 @@ pub fn run() {
             // Vault
             add_vault_entry,
             remove_vault_entry,
+            soft_delete_vault_entry,
+            restore_vault_entry,
+            purge_vault_entry,
+            list_trashed_entries,
+            purge_expired_trash,
             update_vault_entry,
             get_vault_entries,
             reveal_entry_secret,

@@ -152,6 +152,7 @@ pub fn uri_to_vault_entry(uri: &str, category: &str) -> Result<VaultEntry, Strin
         hotp_counter: None,
         is_hotp: false,
         attachments: Vec::new(),
+        deleted_at: None,
     })
 }
 
@@ -205,6 +206,7 @@ pub fn import_google_authenticator(json: &str, category: &str) -> Result<Vec<Vau
             hotp_counter: None,
             is_hotp: false,
             attachments: Vec::new(),
+            deleted_at: None,
         });
     }
     
@@ -259,6 +261,7 @@ pub fn import_authy_csv(csv: &str, category: &str) -> Result<Vec<VaultEntry>, St
             hotp_counter: None,
             is_hotp: false,
             attachments: Vec::new(),
+            deleted_at: None,
         });
     }
     
@@ -315,6 +318,7 @@ pub fn import_manual_entry(
         hotp_counter: None,
         is_hotp: false,
         attachments: Vec::new(),
+        deleted_at: None,
     })
 }
 

@@ -39,6 +39,9 @@ pub struct VaultEntryPublic {
     pub is_hotp: bool,
     #[serde(default)]
     pub attachments: Vec<EntryAttachmentMeta>,
+    /// Soft-delete timestamp (ms); `None` means active.
+    #[serde(default)]
+    pub deleted_at: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -72,6 +75,7 @@ impl From<&VaultEntry> for VaultEntryPublic {
             hotp_counter: entry.hotp_counter,
             is_hotp: entry.is_hotp,
             attachments: entry.attachments.clone(),
+            deleted_at: entry.deleted_at,
         }
     }
 }
@@ -98,6 +102,9 @@ pub struct VaultEntry {
     pub is_hotp: bool,
     #[serde(default)]
     pub attachments: Vec<EntryAttachmentMeta>,
+    /// Soft-delete timestamp (ms); `None` means active.
+    #[serde(default)]
+    pub deleted_at: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

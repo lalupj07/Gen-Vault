@@ -35,6 +35,7 @@ export interface VaultEntry {
   custom_period?: number;
   custom_digits?: number;
   attachments?: EntryAttachmentMeta[];
+  deleted_at?: number | null;
 }
 
 export interface EntryAttachmentMeta {
@@ -278,6 +279,10 @@ export const api = {
     icon: string; color: string; digits?: number; period?: number;
   }) => invoke<VaultEntry>('add_vault_entry', params),
   removeVaultEntry: (entryId: string) => invoke<void>('remove_vault_entry', { entryId }),
+  softDeleteVaultEntry: (entryId: string) => invoke('soft_delete_vault_entry', { entryId }),
+  restoreVaultEntry: (entryId: string) => invoke('restore_vault_entry', { entryId }),
+  purgeVaultEntry: (entryId: string) => invoke('purge_vault_entry', { entryId }),
+  listTrashedEntries: () => invoke<VaultEntry[]>('list_trashed_entries'),
   updateVaultEntry: (entryId: string, updates: { name?: string; issuer?: string; category?: string; notes?: string }) =>
     invoke<VaultEntry>('update_vault_entry', { entryId, ...updates }),
   getVaultEntries: () => invoke<VaultEntry[]>('get_vault_entries'),

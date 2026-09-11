@@ -50,6 +50,9 @@ pub(crate) fn finalize_unlock(key: [u8; 32]) -> Result<User, String> {
         Ok(())
     })?;
 
+    // Drop expired trash once per successful unlock (best-effort).
+    let _ = super::purge_expired_trash();
+
     let vault = load_active_vault(&key)?;
     vault.user.ok_or_else(|| "User data corrupted".to_string())
 }
@@ -642,6 +645,7 @@ pub fn create_entry_from_template(
         hotp_counter: None,
         is_hotp: false,
         attachments: Vec::new(),
+        deleted_at: None,
     };
 
     let public = entry_public(&entry);

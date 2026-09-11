@@ -14,6 +14,21 @@ use super::{
     save_active_vault, session, verify_emergency_code_hash, with_vault,
 };
 use crate::commands::privacy::ensure_export_allowed;
+
+/// Soft-deleted entries older than this (ms) are hard-purged on unlock.
+const TRASH_RETENTION_MS: i64 = 30 * 86_400 * 1_000;
+
+fn is_active(e: &VaultEntry) -> bool {
+    e.deleted_at.is_none()
+}
+
+fn ensure_trash_mutation_allowed(vault: &VaultData) -> Result<(), String> {
+    if vault.settings.travel_mode {
+        return Err("Blocked in travel mode".into());
+    }
+    Ok(())
+}
+
 // ===== Vault Entry Commands =====
 
 #[tauri::command]
@@ -74,6 +89,7 @@ pub fn add_vault_entry(
         hotp_counter: None,
         is_hotp: false,
         attachments: Vec::new(),
+        deleted_at: None,
     };
 
     let public = entry_public(&entry);
@@ -92,22 +108,81 @@ pub fn add_vault_entry(
     Ok(public)
 }
 
+/// Soft-delete: set `deleted_at` (keeps encrypted blob for trash / restore).
+#[tauri::command]
+pub fn soft_delete_vault_entry(entry_id: String) -> Result<(), String> {
+    let name = with_vault(|vault| {
+        let entry = vault
+            .vault_entries
+            .iter_mut()
+            .find(|e| e.id == entry_id && is_active(e))
+            .ok_or("Entry not found".to_string())?;
+        let name = entry.name.clone();
+        entry.deleted_at = Some(now_ts());
+
+        vault.security_events.push(SecurityEvent {
+            id: Uuid::new_v4().to_string(),
+            event_type: "vault_entry_removed".to_string(),
+            message: format!("Moved vault entry to trash: {}", name),
+            timestamp: now_ts(),
+            severity: "warning".to_string(),
+        });
+
+        Ok(name)
+    })?;
+    super::log_entry_history(&entry_id, &name, "deleted", None, None, None);
+    Ok(())
+}
+
+/// Soft-delete (same as trash). Hard forever-delete is `purge_vault_entry`.
 #[tauri::command]
 pub fn remove_vault_entry(entry_id: String) -> Result<(), String> {
+    soft_delete_vault_entry(entry_id)
+}
+
+#[tauri::command]
+pub fn restore_vault_entry(entry_id: String) -> Result<(), String> {
     let name = with_vault(|vault| {
+        ensure_trash_mutation_allowed(vault)?;
+        let entry = vault
+            .vault_entries
+            .iter_mut()
+            .find(|e| e.id == entry_id && e.deleted_at.is_some())
+            .ok_or("Entry not found".to_string())?;
+        let name = entry.name.clone();
+        entry.deleted_at = None;
+
+        vault.security_events.push(SecurityEvent {
+            id: Uuid::new_v4().to_string(),
+            event_type: "vault_entry_restored".to_string(),
+            message: format!("Restored vault entry from trash: {}", name),
+            timestamp: now_ts(),
+            severity: "info".to_string(),
+        });
+
+        Ok(name)
+    })?;
+    super::log_entry_history(&entry_id, &name, "restored", None, None, None);
+    Ok(())
+}
+
+/// Forever-delete a trashed entry (or any entry by id).
+#[tauri::command]
+pub fn purge_vault_entry(entry_id: String) -> Result<(), String> {
+    let name = with_vault(|vault| {
+        ensure_trash_mutation_allowed(vault)?;
         let entry = vault
             .vault_entries
             .iter()
             .find(|e| e.id == entry_id)
             .ok_or("Entry not found".to_string())?;
         let name = entry.name.clone();
-
         vault.vault_entries.retain(|e| e.id != entry_id);
 
         vault.security_events.push(SecurityEvent {
             id: Uuid::new_v4().to_string(),
-            event_type: "vault_entry_removed".to_string(),
-            message: format!("Removed vault entry: {}", name),
+            event_type: "vault_entry_purged".to_string(),
+            message: format!("Permanently deleted vault entry: {}", name),
             timestamp: now_ts(),
             severity: "warning".to_string(),
         });
@@ -115,8 +190,51 @@ pub fn remove_vault_entry(entry_id: String) -> Result<(), String> {
         Ok(name)
     })?;
     vault_db::delete_entry(&entry_id).map_err(|e| e.to_string())?;
-    super::log_entry_history(&entry_id, &name, "deleted", None, None, None);
+    super::log_entry_history(&entry_id, &name, "purged", None, None, None);
     Ok(())
+}
+
+#[tauri::command]
+pub fn list_trashed_entries() -> Result<Vec<VaultEntryPublic>, String> {
+    let key = get_key()?;
+    let vault = load_active_vault(&key).map_err(|e| e.to_string())?;
+    Ok(vault
+        .vault_entries
+        .iter()
+        .filter(|e| e.deleted_at.is_some())
+        .map(entry_public)
+        .collect())
+}
+
+/// Hard-delete trash older than 30 days. Returns number purged.
+#[tauri::command]
+pub fn purge_expired_trash() -> Result<usize, String> {
+    let now = now_ts();
+    let (purged_ids, count) = with_vault(|vault| {
+        let expired: Vec<String> = vault
+            .vault_entries
+            .iter()
+            .filter_map(|e| {
+                let deleted_at = e.deleted_at?;
+                if now.saturating_sub(deleted_at) > TRASH_RETENTION_MS {
+                    Some(e.id.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        let count = expired.len();
+        if count > 0 {
+            vault
+                .vault_entries
+                .retain(|e| !expired.iter().any(|id| id == &e.id));
+        }
+        Ok((expired, count))
+    })?;
+    for id in &purged_ids {
+        let _ = vault_db::delete_entry(id);
+    }
+    Ok(count)
 }
 
 #[tauri::command]
@@ -131,7 +249,7 @@ pub fn update_vault_entry(
         let entry = vault
             .vault_entries
             .iter_mut()
-            .find(|e| e.id == entry_id)
+            .find(|e| e.id == entry_id && is_active(e))
             .ok_or("Entry not found".to_string())?;
 
         let mut changes: Vec<(String, String, String)> = Vec::new();
@@ -191,10 +309,17 @@ pub struct VaultEntriesPage {
 pub fn get_vault_entries_page(offset: u64, limit: u64) -> Result<VaultEntriesPage, String> {
     let key = get_key()?;
     let limit = limit.clamp(1, 500);
-    let entries = vault_db::list_entries(&key, offset, limit).map_err(|e| e.to_string())?;
-    let total = vault_db::count_entries().map_err(|e| e.to_string())?;
+    let vault = load_active_vault(&key).map_err(|e| e.to_string())?;
+    let active: Vec<&VaultEntry> = vault.vault_entries.iter().filter(|e| is_active(e)).collect();
+    let total = active.len() as u64;
+    let entries: Vec<VaultEntryPublic> = active
+        .into_iter()
+        .skip(offset as usize)
+        .take(limit as usize)
+        .map(entry_public)
+        .collect();
     Ok(VaultEntriesPage {
-        entries: entries.iter().map(entry_public).collect(),
+        entries,
         total,
         offset,
         limit,
@@ -203,15 +328,21 @@ pub fn get_vault_entries_page(offset: u64, limit: u64) -> Result<VaultEntriesPag
 
 #[tauri::command]
 pub fn get_vault_entry_count() -> Result<u64, String> {
-    let _key = get_key()?;
-    vault_db::count_entries().map_err(|e| e.to_string())
+    let key = get_key()?;
+    let vault = load_active_vault(&key).map_err(|e| e.to_string())?;
+    Ok(vault.vault_entries.iter().filter(|e| is_active(e)).count() as u64)
 }
 
 #[tauri::command]
 pub fn get_vault_entries() -> Result<Vec<VaultEntryPublic>, String> {
     let key = get_key()?;
-    let entries = vault_db::list_all_entries(&key).map_err(|e| e.to_string())?;
-    Ok(entries.iter().map(entry_public).collect())
+    let vault = load_active_vault(&key).map_err(|e| e.to_string())?;
+    Ok(vault
+        .vault_entries
+        .iter()
+        .filter(|e| is_active(e))
+        .map(entry_public)
+        .collect())
 }
 
 /// Reveal entry secret once while vault is unlocked. Requires master password re-auth.
@@ -228,7 +359,7 @@ pub fn reveal_entry_secret(entry_id: String, password: String) -> Result<String,
     let entry = vault
         .vault_entries
         .iter()
-        .find(|e| e.id == entry_id)
+        .find(|e| e.id == entry_id && is_active(e))
         .ok_or_else(|| "Entry not found".to_string())?;
     Ok(entry.secret.clone())
 }
@@ -247,7 +378,7 @@ pub fn reveal_entry_notes(entry_id: String, password: String) -> Result<String, 
     let entry = vault
         .vault_entries
         .iter()
-        .find(|e| e.id == entry_id)
+        .find(|e| e.id == entry_id && is_active(e))
         .ok_or_else(|| "Entry not found".to_string())?;
     Ok(entry.notes.clone())
 }
@@ -266,7 +397,7 @@ pub fn generate_otp(entry_id: String) -> Result<OtpCode, String> {
     let idx = vault
         .vault_entries
         .iter()
-        .position(|e| e.id == entry_id)
+        .position(|e| e.id == entry_id && is_active(e))
         .ok_or("Entry not found")?;
 
     let entry = &vault.vault_entries[idx];
@@ -300,7 +431,7 @@ pub fn verify_otp(entry_id: String, code: String) -> Result<bool, String> {
     let entry = vault
         .vault_entries
         .iter()
-        .find(|e| e.id == entry_id)
+        .find(|e| e.id == entry_id && is_active(e))
         .ok_or("Entry not found")?;
 
     totp_gen::verify_code(
@@ -335,7 +466,7 @@ pub fn get_provisioning_uri(entry_id: String, password: String) -> Result<String
     let entry = vault
         .vault_entries
         .iter()
-        .find(|e| e.id == entry_id)
+        .find(|e| e.id == entry_id && is_active(e))
         .ok_or("Entry not found")?;
 
     totp_gen::get_provisioning_uri(
@@ -664,6 +795,7 @@ pub fn search_vault_entries(query: String) -> Result<Vec<VaultEntryPublic>, Stri
     with_vault(|vault| {
         let query_lower = query.to_lowercase();
         Ok(vault.vault_entries.iter()
+            .filter(|entry| is_active(entry))
             .filter(|entry| {
                 entry.name.to_lowercase().contains(&query_lower) ||
                 entry.issuer.to_lowercase().contains(&query_lower) ||
@@ -679,7 +811,7 @@ pub fn search_vault_entries(query: String) -> Result<Vec<VaultEntryPublic>, Stri
 pub fn filter_vault_entries_by_category(category: String) -> Result<Vec<VaultEntryPublic>, String> {
     with_vault(|vault| {
         Ok(vault.vault_entries.iter()
-            .filter(|entry| entry.category == category)
+            .filter(|entry| is_active(entry) && entry.category == category)
             .map(entry_public)
             .collect())
     })
@@ -689,7 +821,7 @@ pub fn filter_vault_entries_by_category(category: String) -> Result<Vec<VaultEnt
 pub fn filter_vault_entries_by_tags(tags: Vec<String>) -> Result<Vec<VaultEntryPublic>, String> {
     with_vault(|vault| {
         Ok(vault.vault_entries.iter()
-            .filter(|entry| tags.iter().all(|tag| entry.tags.contains(tag)))
+            .filter(|entry| is_active(entry) && tags.iter().all(|tag| entry.tags.contains(tag)))
             .map(entry_public)
             .collect())
     })
@@ -699,7 +831,7 @@ pub fn filter_vault_entries_by_tags(tags: Vec<String>) -> Result<Vec<VaultEntryP
 pub fn get_favorite_entries() -> Result<Vec<VaultEntryPublic>, String> {
     with_vault(|vault| {
         Ok(vault.vault_entries.iter()
-            .filter(|entry| entry.favorite)
+            .filter(|entry| is_active(entry) && entry.favorite)
             .map(entry_public)
             .collect())
     })
@@ -1027,22 +1159,15 @@ pub fn export_vault_csv() -> Result<String, String> {
 pub fn bulk_delete_entries(entry_ids: Vec<String>) -> Result<usize, String> {
     let (deleted_count, removed_entries): (usize, Vec<(String, String)>) = with_vault(|vault| {
         let mut removed = Vec::new();
-        for id in &entry_ids {
-            if let Some(entry) = vault.vault_entries.iter().find(|e| e.id == *id) {
-                removed.push((id.clone(), entry.name.clone()));
+        let now = now_ts();
+        for entry in vault.vault_entries.iter_mut() {
+            if entry_ids.contains(&entry.id) && is_active(entry) {
+                removed.push((entry.id.clone(), entry.name.clone()));
+                entry.deleted_at = Some(now);
             }
         }
-        let original_len = vault.vault_entries.len();
-        vault.vault_entries.retain(|entry| !entry_ids.contains(&entry.id));
-        let count = original_len - vault.vault_entries.len();
-        if count != removed.len() {
-            removed.retain(|(id, _)| !vault.vault_entries.iter().any(|e| e.id == *id));
-        }
-        Ok((count, removed))
+        Ok((removed.len(), removed))
     })?;
-    for id in &entry_ids {
-        let _ = vault_db::delete_entry(id);
-    }
     for (id, name) in removed_entries {
         super::log_entry_history(&id, &name, "deleted", None, None, None);
     }
