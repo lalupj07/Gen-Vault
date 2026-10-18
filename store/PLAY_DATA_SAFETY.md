@@ -23,13 +23,14 @@ Align with `store/PRIVACY_POLICY.md`. Do not claim “no data collected” — v
 
 - **Personal info → User IDs / credentials** — Usernames, passwords, TOTP secrets, notes, and attachments stored locally in the encrypted vault
 - **App activity** — Not collected or transmitted to GenXis
-- **Android Autofill** — Uses the same on-device vault credentials to fill username/password/OTP into other apps after the user enables GenVault as the Autofill service. Credentials are not sent to GenXis or any new third party.
+- **Android Autofill (preview)**: When the user enables GenVault as the Autofill service, it only offers an "unlock GenVault" prompt; no vault values are filled into other apps yet. Credentials are not sent to GenXis or any third party. Update this answer when dataset fill ships.
 
 ### Collection & sharing
 
 - **Collected:** Yes (stored on device as part of app functionality)
 - **Shared with third parties:** No (GenXis does not receive vault contents)
-- **Autofill (v2.3.0+):** On-device only. Filling into another app is a local OS Autofill handoff; GenXis does not receive filled values. No new data types are shared off-device.
+- **Autofill (v2.3.0+):** On-device only. Current build returns an unlock prompt only (no dataset fill). No data types are shared off-device.
+- **OS backup:** Disabled (`allowBackup=false`, data extraction rules exclude all domains). Vault data is not included in Google cloud backup or device-to-device transfer.
 - **Optional HIBP:** User-initiated only; device sends a SHA-1 hash prefix over HTTPS to Have I Been Pwned; GenXis does not receive this data
 
 ### Security practices

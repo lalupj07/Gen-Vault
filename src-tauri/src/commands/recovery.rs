@@ -5,7 +5,7 @@ use crate::rate_limit;
 use crate::recovery_codes;
 use crate::security_questions;
 use crate::store;
-use super::{get_key, load_active_vault, now_ts, session, validate_master_password, with_vault};
+use super::{ensure_not_duress, get_key, load_active_vault, now_ts, session, set_duress_session, validate_master_password, with_vault};
 // ===== Security Questions =====
 
 #[tauri::command]
@@ -85,6 +85,7 @@ pub fn has_security_questions() -> Result<bool, String> {
 
 #[tauri::command]
 pub fn generate_account_recovery_codes() -> Result<Vec<String>, String> {
+    ensure_not_duress()?;
     if recovery_codes::has_recovery_codes() {
         return Err("Recovery codes already enrolled. Use regenerate to create new codes.".to_string());
     }
@@ -106,6 +107,7 @@ pub fn generate_account_recovery_codes() -> Result<Vec<String>, String> {
 
 #[tauri::command]
 pub fn regenerate_account_recovery_codes() -> Result<Vec<String>, String> {
+    ensure_not_duress()?;
     let key = get_key()?;
     recovery_codes::delete_all_recovery_codes().map_err(|e| e.to_string())?;
     let codes = recovery_codes::enroll_recovery_codes(&key, 10).map_err(|e| e.to_string())?;
@@ -170,6 +172,7 @@ pub fn reset_password_with_recovery_code(
     };
 
     rate_limit::record_success("password_reset").map_err(|e| e.to_string())?;
+    set_duress_session(false);
     *session().lock() = Some(vmk);
     store::enroll_secret("password", &new_password, &vmk)
         .map_err(|e| format!("Failed to set new password: {}", e))?;

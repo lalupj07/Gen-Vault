@@ -59,6 +59,15 @@ pub(crate) fn ensure_lock_suite_allowed() -> Result<(), String> {
     Ok(())
 }
 
+/// Refuse changes to real-vault credentials (auth.json, recovery codes, hardware keys)
+/// during a duress session: the session key is the decoy VMK and would overwrite them.
+pub(crate) fn ensure_not_duress() -> Result<(), String> {
+    if is_duress_session() {
+        return Err("Not available".into());
+    }
+    Ok(())
+}
+
 pub(crate) fn load_active_vault(key: &[u8; 32]) -> Result<VaultData, String> {
     if is_duress_session() {
         store::load_duress_vault_with_key(key).map_err(|e| e.to_string())
@@ -142,23 +151,6 @@ pub(crate) fn validate_master_password(password: &str) -> Result<(), String> {
     }
     if !password.chars().any(|c| !c.is_alphanumeric()) {
         return Err("Password must contain at least one special character".to_string());
-    }
-    Ok(())
-}
-
-/// Unlock PIN: 12+ digits, not trivial patterns (offline brute-force hardening).
-pub(crate) fn validate_unlock_pin(pin: &str) -> Result<(), String> {
-    if pin.len() < 12 || !pin.chars().all(|c| c.is_ascii_digit()) {
-        return Err("PIN must be at least 12 digits".to_string());
-    }
-    if pin.chars().all(|c| c == pin.as_bytes()[0] as char) {
-        return Err("PIN cannot use the same digit repeatedly".to_string());
-    }
-    let digits: Vec<u8> = pin.bytes().map(|b| b - b'0').collect();
-    let ascending = digits.windows(2).all(|w| w[1] == w[0].wrapping_add(1) % 10);
-    let descending = digits.windows(2).all(|w| w[1] == w[0].wrapping_sub(1) % 10);
-    if ascending || descending {
-        return Err("PIN cannot be a simple sequential pattern".to_string());
     }
     Ok(())
 }

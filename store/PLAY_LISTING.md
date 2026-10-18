@@ -12,27 +12,27 @@ Offline 2FA vault with encrypted local storage. No cloud sync required.
 
 ## Full description
 
-GenVault is an offline-first two-factor authentication vault and encrypted credential manager. Your secrets stay on your device — GenXis Innovations does not host a cloud vault.
+GenVault is an offline-first two-factor authentication vault and encrypted credential manager. Your secrets stay on your device. GenXis Innovations does not host a cloud vault.
 
 **Features**
 
-- **Offline TOTP / 2FA** — Generate time-based one-time passwords without internet
-- **Android Autofill (scaffold)** — Optional system Autofill service with Settings toggle and unlock Intent; dataset fill pending a later session bridge — credentials never leave your device for Autofill
-- **Codes-first UX** — Calm Codes landing, scan-first FAB, issuer icons, and intentional empty states
-- **Soft-delete trash** — Restore deleted entries for 30 days, fully offline
-- **Aegis import** — Import authenticator accounts from an Aegis JSON export
-- **AES-256-GCM encryption** — Vault data encrypted at rest with authenticated encryption
-- **Argon2id key derivation** — Master password stretched with memory-hard KDF
-- **Biometric unlock** — Fingerprint or face unlock on supported Android devices
-- **Encrypted backup & import** — Export and restore vault data in encrypted format
-- **QR code setup** — Add authenticator accounts by scanning QR codes
-- **Time-sync warning** — Alerts when device clock drift may affect TOTP codes
-- **No analytics by default** — No advertising or analytics SDKs in production builds
-- **Open-source crypto libraries** — Built on audited, widely used cryptographic components
+- **Offline TOTP / 2FA:** Generate time-based one-time passwords without internet
+- **Android Autofill (preview):** Optional system Autofill service with a Settings toggle. It currently opens GenVault to unlock; filling credentials into other apps is not yet available. Credentials never leave your device
+- **Codes-first UX:** Codes landing screen, scan-first button, issuer icons, and clear empty states
+- **Soft-delete trash:** Restore deleted entries for 30 days, fully offline
+- **Aegis import:** Import authenticator accounts from an Aegis JSON export
+- **AES-256-GCM encryption:** Vault data encrypted at rest with authenticated encryption
+- **Argon2id key derivation:** Master password stretched with a memory-hard KDF
+- **Biometric confirmation:** Fingerprint, face, or device PIN confirmation alongside your master password on supported Android devices
+- **Encrypted backup & import:** Export and restore vault data in encrypted format
+- **QR code setup:** Add authenticator accounts by scanning QR codes
+- **Time-sync warning:** Alerts when device clock drift may affect TOTP codes
+- **No analytics:** No advertising or analytics SDKs in production builds
+- **Open-source crypto libraries:** Built on widely used Rust cryptography crates (RustCrypto AES-GCM, Argon2)
 
 **Optional online feature**
 
-- **Have I Been Pwned (HIBP)** — Optional, user-initiated password breach check; sends only a password hash prefix (k-anonymity)
+- **Have I Been Pwned (HIBP):** Optional, user-initiated password breach check; sends only the first 5 characters of a SHA-1 password hash (k-anonymity)
 
 GenVault is built with Tauri and Rust for a small footprint and memory-safe cryptography.
 

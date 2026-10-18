@@ -673,6 +673,7 @@ export function QROnboardView() {
           </GlassCard>
           <GlassCard className="flex flex-col items-center justify-center py-6">
             {qrDataUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- local data: URL, next/image can't optimize it
               <img src={qrDataUrl} alt="Vault transfer QR" className="w-56 h-56 rounded-xl bg-white p-2" />
             ) : (
               <QrCode className="w-24 h-24 text-vault-muted/30" />

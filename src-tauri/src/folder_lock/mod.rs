@@ -6,6 +6,32 @@ pub mod policy;
 pub mod service;
 pub mod store;
 
+use std::path::Path;
+
+/// If `path` is a symlink or junction, delete the link itself (never its target)
+/// and return `true`. Staging wipes must call this before following any entry.
+pub(crate) fn remove_if_link(path: &Path) -> std::io::Result<bool> {
+    let meta = match std::fs::symlink_metadata(path) {
+        Ok(m) => m,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(e) => return Err(e),
+    };
+    #[cfg(windows)]
+    let reparse = {
+        use std::os::windows::fs::MetadataExt;
+        meta.file_attributes() & 0x400 != 0
+    };
+    #[cfg(not(windows))]
+    let reparse = false;
+    if !meta.file_type().is_symlink() && !reparse {
+        return Ok(false);
+    }
+    if std::fs::remove_file(path).is_err() {
+        std::fs::remove_dir(path)?;
+    }
+    Ok(true)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

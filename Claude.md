@@ -3,7 +3,7 @@ description:
 alwaysApply: true
 ---
 
-Read SKILL.md first.
+Read `.devin/skills/Gen Vault/SKILL.md` first.
 
 Security is highest priority.
 

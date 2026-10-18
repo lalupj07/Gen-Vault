@@ -246,7 +246,7 @@ export default function MobileEntryDetail({ entry, onBack, onDeleted, onUpdated 
         ) : (
           <>
             <p className="text-sm text-[color:var(--md-on-surface-variant)] mt-4 mb-4">
-              Password is encrypted at rest. Reveal only when needed — clipboard auto-clears.
+              Password is encrypted at rest. Reveal only when needed. Clipboard auto-clears.
             </p>
             <button
               type="button"

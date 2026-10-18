@@ -1,5 +1,6 @@
 use rand::Rng;
 use serde::{Deserialize, Serialize};
+use zeroize::Zeroize;
 
 use crate::crypto;
 use crate::store::{self, StoreError};
@@ -69,8 +70,10 @@ pub fn enroll_recovery_codes(vmk: &[u8; 32], count: usize) -> Result<Vec<String>
     for _ in 0..count {
         let code = generate_code();
         let salt = crypto::generate_salt();
-        let wrap_key = crypto::derive_key(&normalize_code(&code), &salt)?;
-        let wrapped_vmk = crypto::encrypt(vmk, &wrap_key)?;
+        let mut wrap_key = crypto::derive_key(&normalize_code(&code), &salt)?;
+        let wrapped_vmk = crypto::encrypt(vmk, &wrap_key);
+        wrap_key.zeroize();
+        let wrapped_vmk = wrapped_vmk?;
         wraps.push(RecoveryWrap {
             salt,
             wrapped_vmk,
@@ -105,9 +108,13 @@ pub fn verify_recovery_code(code: &str) -> Result<bool, StoreError> {
         if wrap.used {
             continue;
         }
-        let wrap_key = crypto::derive_key(&normalized, &wrap.salt)?;
-        if let Ok(vmk_bytes) = crypto::decrypt(&wrap.wrapped_vmk, &wrap_key) {
-            if vmk_bytes.len() == 32 {
+        let mut wrap_key = crypto::derive_key(&normalized, &wrap.salt)?;
+        let decrypted = crypto::decrypt(&wrap.wrapped_vmk, &wrap_key);
+        wrap_key.zeroize();
+        if let Ok(mut vmk_bytes) = decrypted {
+            let ok = vmk_bytes.len() == 32;
+            vmk_bytes.zeroize();
+            if ok {
                 return Ok(true);
             }
         }
@@ -127,15 +134,22 @@ pub fn recover_vmk_with_code(code: &str) -> Result<[u8; 32], StoreError> {
         if wrap.used {
             continue;
         }
-        let wrap_key = crypto::derive_key(&normalized, &wrap.salt)?;
-        if let Ok(vmk_bytes) = crypto::decrypt(&wrap.wrapped_vmk, &wrap_key) {
+        let mut wrap_key = crypto::derive_key(&normalized, &wrap.salt)?;
+        let decrypted = crypto::decrypt(&wrap.wrapped_vmk, &wrap_key);
+        wrap_key.zeroize();
+        if let Ok(mut vmk_bytes) = decrypted {
             if vmk_bytes.len() == 32 {
-                wrap.used = true;
-                save_store(&store_data)?;
                 let mut vmk = [0u8; 32];
                 vmk.copy_from_slice(&vmk_bytes);
+                vmk_bytes.zeroize();
+                wrap.used = true;
+                if let Err(e) = save_store(&store_data) {
+                    vmk.zeroize();
+                    return Err(e);
+                }
                 return Ok(vmk);
             }
+            vmk_bytes.zeroize();
         }
     }
     Err(StoreError::InvalidSecret)

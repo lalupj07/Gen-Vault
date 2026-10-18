@@ -582,15 +582,6 @@ pub fn get_all_questions() -> Vec<SecurityQuestion> {
     get_security_questions_library()
 }
 
-/// Get questions by category
-pub fn get_questions_by_category(category: &str) -> Vec<SecurityQuestion> {
-    get_security_questions_library()
-        .iter()
-        .filter(|q| q.category == category)
-        .cloned()
-        .collect()
-}
-
 /// Get random questions (for selection during enrollment)
 pub fn get_random_questions(count: usize) -> Vec<SecurityQuestion> {
     use rand::seq::SliceRandom;

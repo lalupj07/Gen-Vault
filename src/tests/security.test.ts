@@ -292,5 +292,3 @@ describe('Security Performance Tests', () => {
     expect(duration).toBeLessThan(1000); // 1 second
   });
 });
-
-export default {};

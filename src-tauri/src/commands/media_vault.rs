@@ -6,7 +6,7 @@ use base64::{engine::general_purpose::STANDARD as B64, Engine};
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroize;
 
-use crate::commands::{ensure_lock_suite_allowed, get_key};
+use crate::commands::{ensure_lock_suite_allowed, get_key, is_duress_session};
 use crate::media_vault::service::{
     BatchImportResult, MediaItemPublic, MediaVaultService, ServiceError,
 };
@@ -87,11 +87,11 @@ fn verify_master_password(password: &str) -> Result<(), String> {
 
 #[cfg(windows)]
 fn open_with_default_app(path: &Path) -> Result<(), String> {
-    let path_str = path.to_string_lossy();
-    std::process::Command::new("cmd")
-        .args(["/C", "start", "", &path_str])
+    // Never route through `cmd /C start`: file names may contain `&`, `^`, `%`.
+    std::process::Command::new("explorer.exe")
+        .arg(path)
         .spawn()
-        .map_err(|e| e.to_string())?;
+        .map_err(|_| "Could not open the file viewer".to_string())?;
     Ok(())
 }
 
@@ -99,6 +99,9 @@ fn open_with_default_app(path: &Path) -> Result<(), String> {
 pub fn media_vault_list() -> Result<Vec<MediaItemPublic>, String> {
     require_windows()?;
     let _key = get_key()?;
+    if is_duress_session() {
+        return Ok(Vec::new());
+    }
     service()?.list().map_err(map_err)
 }
 
@@ -106,6 +109,9 @@ pub fn media_vault_list() -> Result<Vec<MediaItemPublic>, String> {
 pub fn media_vault_search(query: String) -> Result<Vec<MediaItemPublic>, String> {
     require_windows()?;
     let _key = get_key()?;
+    if is_duress_session() {
+        return Ok(Vec::new());
+    }
     service()?.search(&query).map_err(map_err)
 }
 
@@ -182,6 +188,7 @@ pub fn media_vault_delete(id: String) -> Result<(), String> {
 pub fn media_vault_export(id: String, dest_path: String, password: String) -> Result<(), String> {
     require_windows()?;
     ensure_lock_suite_allowed()?;
+    crate::commands::privacy::ensure_export_allowed()?;
     verify_master_password(&password)?;
     let key = get_key()?;
     service()?
@@ -225,6 +232,9 @@ pub fn media_vault_set_album(id: String, album: String) -> Result<(), String> {
 pub fn media_vault_activity(limit: Option<usize>) -> Result<Vec<ActivityRow>, String> {
     require_windows()?;
     let _key = get_key()?;
+    if is_duress_session() {
+        return Ok(Vec::new());
+    }
     service()?.activity(limit.unwrap_or(50)).map_err(map_err)
 }
 

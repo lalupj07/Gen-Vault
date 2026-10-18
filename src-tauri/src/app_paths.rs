@@ -3,6 +3,7 @@ use std::sync::OnceLock;
 
 static DATA_DIR: OnceLock<PathBuf> = OnceLock::new();
 
+#[cfg(target_os = "android")]
 pub fn init(path: PathBuf) {
     let _ = DATA_DIR.set(path);
 }

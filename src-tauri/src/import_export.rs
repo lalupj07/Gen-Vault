@@ -33,13 +33,36 @@ fn decode_uri_component(input: &str) -> String {
     out
 }
 
+/// Max bytes accepted for any import file / payload / URI (DoS bound).
+pub const MAX_IMPORT_BYTES: usize = 5 * 1024 * 1024;
+/// Max entries accepted from one import.
+pub const MAX_IMPORT_ENTRIES: usize = 5_000;
+const MAX_URI_BYTES: usize = 4096;
+/// Generated share/transfer payloads are capped at 2800 chars; leave headroom.
+const MAX_PAYLOAD_BYTES: usize = 16 * 1024;
+
+fn ensure_import_size(input: &str) -> Result<(), String> {
+    if input.len() > MAX_IMPORT_BYTES {
+        return Err("Import file is too large".to_string());
+    }
+    Ok(())
+}
+
+fn ensure_entry_count(n: usize) -> Result<(), String> {
+    if n > MAX_IMPORT_ENTRIES {
+        return Err(format!("Import exceeds {MAX_IMPORT_ENTRIES} entries"));
+    }
+    Ok(())
+}
+
 /// Parse otpauth:// URI
 pub fn parse_otpauth_uri(uri: &str) -> Result<OtpAuthUri, String> {
-    if !uri.starts_with("otpauth://") {
-        return Err("Invalid URI: must start with otpauth://".to_string());
+    if uri.len() > MAX_URI_BYTES {
+        return Err("Invalid URI: too long".to_string());
     }
-    
-    let uri = &uri[11..]; // Remove "otpauth://"
+    let uri = uri
+        .strip_prefix("otpauth://")
+        .ok_or_else(|| "Invalid URI: must start with otpauth://".to_string())?;
     let parts: Vec<&str> = uri.split('?').collect();
     
     if parts.len() < 2 {
@@ -173,12 +196,18 @@ pub struct GoogleAuthAccount {
 }
 
 pub fn import_google_authenticator(json: &str, category: &str) -> Result<Vec<VaultEntry>, String> {
+    ensure_import_size(json)?;
     let export: GoogleAuthenticatorExport = serde_json::from_str(json)
         .map_err(|e| format!("Invalid JSON: {}", e))?;
+    ensure_entry_count(export.accounts.len())?;
     
     let mut entries = Vec::new();
     
     for account in export.accounts {
+        // period 0 marks password entries; a TOTP seed must never become one.
+        if account.period == Some(0) {
+            return Err(format!("Invalid period for {}", account.name));
+        }
         let decoded_secret = base32::decode(
             base32::Alphabet::Rfc4648 { padding: true },
             &account.secret,
@@ -260,6 +289,7 @@ struct AegisOtpInfo {
 /// Import TOTP entries from an unencrypted Aegis JSON vault export.
 /// Encrypted exports are rejected; never logs secrets.
 pub fn import_aegis_json(json: &str, category: &str) -> Result<Vec<VaultEntry>, String> {
+    ensure_import_size(json)?;
     let export: AegisExport = serde_json::from_str(json)
         .map_err(|_| "Invalid Aegis JSON: expected a vault export object".to_string())?;
 
@@ -289,6 +319,7 @@ pub fn import_aegis_json(json: &str, category: &str) -> Result<Vec<VaultEntry>, 
         }
     }
 
+    ensure_entry_count(db.entries.len())?;
     let mut entries = Vec::new();
     for item in db.entries {
         if !item.entry_type.eq_ignore_ascii_case("totp") {
@@ -376,6 +407,8 @@ pub fn import_aegis_json(json: &str, category: &str) -> Result<Vec<VaultEntry>, 
 
 /// Import from Authy export (CSV format)
 pub fn import_authy_csv(csv: &str, category: &str) -> Result<Vec<VaultEntry>, String> {
+    ensure_import_size(csv)?;
+    ensure_entry_count(csv.lines().count().saturating_sub(1))?;
     let mut entries = Vec::new();
     
     for (i, line) in csv.lines().enumerate() {
@@ -483,6 +516,31 @@ pub fn import_manual_entry(
     })
 }
 
+/// Entries decrypted from a transfer/share payload are attacker-shaped: the
+/// passphrase proves possession, not that the sender is honest.
+fn sanitize_payload_entries(entries: Vec<VaultEntry>) -> Result<Vec<VaultEntry>, String> {
+    ensure_entry_count(entries.len())?;
+    entries
+        .into_iter()
+        .map(|mut e| -> Result<VaultEntry, String> {
+            let safe_id = !e.id.is_empty()
+                && e.id.len() <= 64
+                && e.id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-');
+            if !safe_id {
+                e.id = uuid::Uuid::new_v4().to_string();
+            }
+            // Attachment blobs never travel with the payload.
+            e.attachments.clear();
+            e.deleted_at = None;
+            if e.period > 0 || e.is_hotp {
+                totp_gen::secret_to_base32(&e.secret)
+                    .map_err(|_| "Payload contains an invalid secret".to_string())?;
+            }
+            Ok(e)
+        })
+        .collect()
+}
+
 const TRANSFER_PREFIX: &str = "gvtransfer:v1:";
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -526,6 +584,9 @@ pub fn import_transfer_payload(payload: &str, passphrase: &str) -> Result<Vec<Va
     use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
     use crate::crypto;
 
+    if payload.len() > MAX_PAYLOAD_BYTES {
+        return Err("Transfer payload is too large".to_string());
+    }
     let encoded = payload
         .strip_prefix(TRANSFER_PREFIX)
         .ok_or("Invalid transfer payload format")?;
@@ -540,7 +601,7 @@ pub fn import_transfer_payload(payload: &str, passphrase: &str) -> Result<Vec<Va
     let json = crypto::decrypt(ciphertext, &key).map_err(|_| "Invalid transfer passphrase")?;
     let package: TransferPackage =
         serde_json::from_slice(&json).map_err(|_| "Transfer payload is corrupted")?;
-    Ok(package.entries)
+    sanitize_payload_entries(package.entries)
 }
 
 const SHARE_PREFIX: &str = "gvshare:v1:";
@@ -595,10 +656,13 @@ pub fn create_share_payload(
 }
 
 /// Decrypt and validate a share payload.
-pub fn import_share_payload(payload: &str, passphrase: &str) -> Result<SharePackage, String> {
+pub(crate) fn import_share_payload(payload: &str, passphrase: &str) -> Result<SharePackage, String> {
     use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
     use crate::crypto;
 
+    if payload.len() > MAX_PAYLOAD_BYTES {
+        return Err("Share payload is too large".to_string());
+    }
     let encoded = payload
         .strip_prefix(SHARE_PREFIX)
         .ok_or("Invalid share payload format")?;
@@ -611,8 +675,9 @@ pub fn import_share_payload(payload: &str, passphrase: &str) -> Result<SharePack
     let (salt, ciphertext) = blob.split_at(32);
     let key = crypto::derive_key(passphrase, salt).map_err(|e| e.to_string())?;
     let json = crypto::decrypt(ciphertext, &key).map_err(|_| "Invalid share passphrase")?;
-    let package: SharePackage =
+    let mut package: SharePackage =
         serde_json::from_slice(&json).map_err(|_| "Share payload is corrupted")?;
+    package.entries = sanitize_payload_entries(std::mem::take(&mut package.entries))?;
 
     if let Some(exp) = package.expires_at {
         if chrono::Utc::now().timestamp() > exp {

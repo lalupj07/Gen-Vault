@@ -87,7 +87,16 @@ fn guest_grants_dir() -> Result<PathBuf, GuestError> {
     Ok(store::data_dir_public()?.join("guest-grants"))
 }
 
+/// Grant ids arrive from an unauthenticated IPC call and are joined into paths.
+fn ensure_grant_id(grant_id: &str) -> Result<(), GuestError> {
+    match Uuid::parse_str(grant_id) {
+        Ok(u) if u.hyphenated().to_string() == grant_id => Ok(()),
+        _ => Err(GuestError::NotFound),
+    }
+}
+
 fn grant_sidecar_path(grant_id: &str) -> Result<PathBuf, GuestError> {
+    ensure_grant_id(grant_id)?;
     Ok(guest_grants_dir()?.join(format!("{grant_id}.grant")))
 }
 
@@ -147,22 +156,34 @@ fn clamp_ttl(ttl_mins: u32) -> u32 {
     ttl_mins.clamp(MIN_TTL_MINS, MAX_TTL_MINS)
 }
 
-fn wrap_dek_for_passphrase(dek: &[u8; 32], passphrase: &str) -> Result<(Vec<u8>, Vec<u8>), GuestError> {
+/// The sidecar is readable without the VMK, so its policy fields (expiry, item)
+/// are bound into the DEK wrap as AAD; editing them breaks the unwrap.
+fn grant_aad(id: &str, kind: GuestKind, item_id: &str, expires_at: i64) -> Vec<u8> {
+    format!("gvguest:v2\0{id}\0{kind:?}\0{item_id}\0{expires_at}").into_bytes()
+}
+
+fn wrap_dek_for_passphrase(
+    dek: &[u8; 32],
+    passphrase: &str,
+    aad: &[u8],
+) -> Result<(Vec<u8>, Vec<u8>), GuestError> {
     let salt = crypto::generate_salt();
-    let wrap_key = crypto::derive_key(passphrase, &salt)?;
-    let wrapped = crypto::encrypt(dek, &wrap_key)?;
-    Ok((salt, wrapped))
+    let mut wrap_key = crypto::derive_key(passphrase, &salt)?;
+    let wrapped = crypto::encrypt_with_aad(dek, &wrap_key, aad);
+    wrap_key.zeroize();
+    Ok((salt, wrapped?))
 }
 
 fn unwrap_dek_from_passphrase(
     wrapped: &[u8],
     salt: &[u8],
     passphrase: &str,
+    aad: &[u8],
 ) -> Result<[u8; 32], GuestError> {
     let mut wrap_key = crypto::derive_key(passphrase, salt)?;
-    let mut plain =
-        crypto::decrypt(wrapped, &wrap_key).map_err(|_| GuestError::InvalidPassphrase)?;
+    let plain = crypto::decrypt_with_aad(wrapped, &wrap_key, aad);
     wrap_key.zeroize();
+    let mut plain = plain.map_err(|_| GuestError::InvalidPassphrase)?;
     if plain.len() != 32 {
         plain.zeroize();
         return Err(GuestError::InvalidPassphrase);
@@ -219,7 +240,7 @@ fn media_rel_aad(id: &str, basename: &str) -> String {
 }
 
 fn wipe_dir_tree(path: &Path) -> Result<(), GuestError> {
-    if !path.exists() {
+    if crate::folder_lock::remove_if_link(path)? || !path.exists() {
         return Ok(());
     }
     if path.is_file() {
@@ -229,6 +250,9 @@ fn wipe_dir_tree(path: &Path) -> Result<(), GuestError> {
     for entry in fs::read_dir(path)? {
         let entry = entry?;
         let p = entry.path();
+        if crate::folder_lock::remove_if_link(&p)? {
+            continue;
+        }
         if p.is_dir() {
             wipe_dir_tree(&p)?;
         } else {
@@ -357,16 +381,20 @@ pub fn create_grant(
         return Err(GuestError::PassphraseTooShort);
     }
     let ttl = clamp_ttl(ttl_mins);
+    let id = Uuid::new_v4().to_string();
+    let expires_at = chrono::Utc::now().timestamp() + (ttl as i64 * 60);
     let mut dek = load_item_dek(kind, item_id, vault_key)?;
-    let (salt, wrapped_dek) = wrap_dek_for_passphrase(&dek, passphrase)?;
+    let wrapped =
+        wrap_dek_for_passphrase(&dek, passphrase, &grant_aad(&id, kind, item_id, expires_at));
     dek.zeroize();
+    let (salt, wrapped_dek) = wrapped?;
 
     let grant = GuestGrant {
-        id: Uuid::new_v4().to_string(),
+        id,
         kind,
         item_id: item_id.to_string(),
         label: label.to_string(),
-        expires_at: chrono::Utc::now().timestamp() + (ttl as i64 * 60),
+        expires_at,
         salt,
         wrapped_dek,
     };
@@ -417,7 +445,17 @@ pub fn guest_unlock(grant_id: &str, passphrase: &str) -> Result<GuestUnlockResul
         return Err(GuestError::Expired);
     }
 
-    let mut dek = match unwrap_dek_from_passphrase(&grant.wrapped_dek, &grant.salt, passphrase) {
+    if grant.id != grant_id {
+        let _ = rate_limit::record_failure(GUEST_UNLOCK_ACTION);
+        return Err(GuestError::NotFound);
+    }
+    let aad = grant_aad(&grant.id, grant.kind, &grant.item_id, grant.expires_at);
+    let mut dek = match unwrap_dek_from_passphrase(
+        &grant.wrapped_dek,
+        &grant.salt,
+        passphrase,
+        &aad,
+    ) {
         Ok(d) => d,
         Err(e @ GuestError::InvalidPassphrase) => {
             let _ = rate_limit::record_failure(GUEST_UNLOCK_ACTION);

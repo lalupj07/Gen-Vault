@@ -397,23 +397,14 @@ export function CommandPalette({ open, onClose, onNavigate, onAction }: CommandP
     item.category.toLowerCase().includes(query.toLowerCase())
   );
 
-  const viewMap: Record<string, string> = {
-    dashboard: 'dashboard', authenticator: 'authenticator', vault: 'vault',
-    settings: 'settings', recovery: 'recovery', sessions: 'sessions',
-    devices: 'devices', 'qr-onboard': 'qr-onboard', 'threat-detection': 'threat-detection',
-    profile: 'profile', biometrics: 'biometrics',
-  };
-
-  const actionIds = new Set(Object.keys(PALETTE_ACTION_MAP));
-
-  const execute = (id: string) => {
-    if (actionIds.has(id)) {
+  const execute = useCallback((id: string) => {
+    if (Object.prototype.hasOwnProperty.call(PALETTE_ACTION_MAP, id)) {
       onAction?.(id);
     } else {
-      onNavigate(viewMap[id] || id);
+      onNavigate(id);
     }
     onClose();
-  };
+  }, [onAction, onNavigate, onClose]);
 
   useEffect(() => {
     if (!open) return;
@@ -425,7 +416,7 @@ export function CommandPalette({ open, onClose, onNavigate, onAction }: CommandP
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, filtered, selected, onClose]);
+  }, [open, filtered, selected, onClose, execute]);
 
   return (
     <AnimatePresence>

@@ -121,12 +121,6 @@ pub fn list_all(limit: u32) -> Result<Vec<EntryHistoryRecord>, StoreError> {
     rows.collect::<Result<Vec<_>, _>>().map_err(StoreError::from)
 }
 
-pub fn wipe() -> Result<(), StoreError> {
-    let conn = open_db()?;
-    conn.execute("DELETE FROM entry_history", [])?;
-    Ok(())
-}
-
 /// Clear legacy plaintext note bodies from history (idempotent).
 pub fn scrub_sensitive_history() -> Result<(), StoreError> {
     let conn = open_db()?;

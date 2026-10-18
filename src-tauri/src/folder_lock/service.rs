@@ -659,7 +659,7 @@ fn secure_wipe_file(path: &Path) -> Result<(), ServiceError> {
 }
 
 fn wipe_dir_tree(path: &Path) -> Result<(), ServiceError> {
-    if !path.exists() {
+    if super::remove_if_link(path)? || !path.exists() {
         return Ok(());
     }
     prepare_tree_writable(path)?;
@@ -671,6 +671,9 @@ fn wipe_dir_tree(path: &Path) -> Result<(), ServiceError> {
     for entry in fs::read_dir(path)? {
         let entry = entry?;
         let p = entry.path();
+        if super::remove_if_link(&p)? {
+            continue;
+        }
         if p.is_dir() {
             wipe_dir_tree(&p)?;
         } else {

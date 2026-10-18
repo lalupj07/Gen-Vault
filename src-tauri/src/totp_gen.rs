@@ -185,7 +185,18 @@ pub fn get_provisioning_uri(
 ) -> Result<String, String> {
     let _totp = make_totp(secret, digits, period)?;
     let encoded_secret = secret_to_base32(secret)?.replace('=', "");
-    let enc = |s: &str| s.replace(' ', "%20").replace(':', "%3A");
+    // Percent-encode everything but RFC 3986 unreserved chars so a crafted
+    // issuer/account cannot inject `&secret=` or other query params.
+    let enc = |s: &str| {
+        s.bytes()
+            .map(|b| match b {
+                b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
+                    (b as char).to_string()
+                }
+                _ => format!("%{:02X}", b),
+            })
+            .collect::<String>()
+    };
     let scheme = if is_hotp { "hotp" } else { "totp" };
     let mut uri = format!(
         "otpauth://{}/{}:{}?secret={}&issuer={}&algorithm=SHA1&digits={}",
@@ -236,5 +247,15 @@ mod tests {
         .expect("otp");
         assert_eq!(code.code.len(), 6);
         assert!(code.code.chars().all(|c| c.is_ascii_digit()));
+    }
+
+    #[test]
+    fn provisioning_uri_rejects_param_injection() {
+        let secret = encode_secret_bytes(b"0123456789abcdef");
+        let uri = get_provisioning_uri(&secret, "a&secret=EVIL", "x?y#z&period=1", 6, 30, false)
+            .expect("uri");
+        assert_eq!(uri.matches("secret=").count(), 1);
+        assert_eq!(uri.matches("&period=").count(), 1);
+        assert!(!uri.contains('#'));
     }
 }

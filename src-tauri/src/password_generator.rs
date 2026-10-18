@@ -60,7 +60,8 @@ pub fn generate_password(
         charset.push_str("abcdefghijklmnopqrstuvwxyz");
     }
     
-    (0..length)
+    // IPC-supplied length: cap to avoid unbounded allocation.
+    (0..length.min(1024))
         .map(|_| secure_random_char(charset.as_bytes()))
         .collect()
 }
@@ -87,7 +88,7 @@ pub fn generate_passphrase(word_count: usize, separator: &str, capitalize: bool)
     ];
     
     let mut rng = rand::thread_rng();
-    let words: Vec<String> = (0..word_count)
+    let words: Vec<String> = (0..word_count.min(64))
         .map(|_| {
             let idx = rng.gen_range(0..WORDS.len());
             let word = WORDS[idx];

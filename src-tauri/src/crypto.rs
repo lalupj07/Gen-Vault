@@ -179,12 +179,6 @@ pub fn bytes_to_hex(bytes: &[u8]) -> String {
 }
 
 /// Decode a lowercase hex string into bytes
-pub fn hex_to_bytes(hex: &str) -> Result<Vec<u8>, CryptoError> {
-    if hex.len() % 2 != 0 {
-        return Err(CryptoError::InvalidFormat);
-    }
-    (0..hex.len())
-        .step_by(2)
-        .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).map_err(|_| CryptoError::InvalidFormat))
-        .collect()
+pub fn hex_to_bytes(s: &str) -> Result<Vec<u8>, CryptoError> {
+    hex::decode(s).map_err(|_| CryptoError::InvalidFormat)
 }

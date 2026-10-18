@@ -19,6 +19,7 @@ build/
 release/
 *.msi
 *.msix
+*.appx
 *.exe
 *.apk
 *.aab
@@ -40,7 +41,9 @@ Thumbs.db
 # IDE / local agent
 .vscode/
 .idea/
-.cursor/
+.cursor/*
+!.cursor/rules/
+!.cursor/skills/
 .superpowers/
 .worktrees/
 worktrees/
@@ -60,6 +63,11 @@ store/msix/*.msix
 # Android signing / Gradle
 *.jks
 *.keystore
+keystore.properties
+upload-credentials*.txt
+*.pfx
+*.pem
+*.key
 !src-tauri/icons/**
 src-tauri/gen/android/**/build/
 src-tauri/gen/android/**/.gradle/

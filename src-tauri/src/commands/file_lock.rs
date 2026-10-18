@@ -6,7 +6,7 @@ use std::sync::OnceLock;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 
-use crate::commands::{ensure_lock_suite_allowed, get_key};
+use crate::commands::{ensure_lock_suite_allowed, get_key, is_duress_session};
 use crate::file_lock::deep_link::FileLockDeepLink;
 use crate::file_lock::service::{
     BatchLockResult, FileLockService, LockedFilePublic, ServiceError,
@@ -89,6 +89,9 @@ fn save_settings(settings: &FileLockSettings) -> Result<(), String> {
 pub fn file_lock_list() -> Result<Vec<LockedFilePublic>, String> {
     require_windows()?;
     let _key = get_key()?;
+    if is_duress_session() {
+        return Ok(Vec::new());
+    }
     service()?.list().map_err(map_err)
 }
 
@@ -96,6 +99,9 @@ pub fn file_lock_list() -> Result<Vec<LockedFilePublic>, String> {
 pub fn file_lock_search(query: String) -> Result<Vec<LockedFilePublic>, String> {
     require_windows()?;
     let _key = get_key()?;
+    if is_duress_session() {
+        return Ok(Vec::new());
+    }
     let q = query.trim().to_lowercase();
     let list = service()?.list().map_err(map_err)?;
     if q.is_empty() {
@@ -157,6 +163,7 @@ pub fn file_lock_relock(id: String) -> Result<(), String> {
 pub fn file_lock_restore(id: String) -> Result<(), String> {
     require_windows()?;
     ensure_lock_suite_allowed()?;
+    crate::commands::privacy::ensure_export_allowed()?;
     let key = get_key()?;
     service()?.restore_to_original(&id, &key).map_err(map_err)
 }
@@ -173,6 +180,9 @@ pub fn file_lock_set_favorite(id: String, favorite: bool) -> Result<(), String> 
 pub fn file_lock_activity(limit: Option<usize>) -> Result<Vec<ActivityRow>, String> {
     require_windows()?;
     let _key = get_key()?;
+    if is_duress_session() {
+        return Ok(Vec::new());
+    }
     service()?.activity(limit.unwrap_or(50)).map_err(map_err)
 }
 

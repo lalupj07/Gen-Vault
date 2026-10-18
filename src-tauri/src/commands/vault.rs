@@ -18,8 +18,19 @@ use crate::commands::privacy::ensure_export_allowed;
 /// Soft-deleted entries older than this (ms) are hard-purged on unlock.
 const TRASH_RETENTION_MS: i64 = 30 * 86_400 * 1_000;
 
+/// Entries with this tag are hidden from every read path while travel mode is on.
+const TRAVEL_HIDE_TAG: &str = "travel-hide";
+
 fn is_active(e: &VaultEntry) -> bool {
     e.deleted_at.is_none()
+}
+
+fn is_travel_hidden(e: &VaultEntry, travel_mode: bool) -> bool {
+    travel_mode && e.tags.iter().any(|t| t == TRAVEL_HIDE_TAG)
+}
+
+fn is_visible(e: &VaultEntry, travel_mode: bool) -> bool {
+    is_active(e) && !is_travel_hidden(e, travel_mode)
 }
 
 fn ensure_trash_mutation_allowed(vault: &VaultData) -> Result<(), String> {
@@ -112,10 +123,11 @@ pub fn add_vault_entry(
 #[tauri::command]
 pub fn soft_delete_vault_entry(entry_id: String) -> Result<(), String> {
     let name = with_vault(|vault| {
+        let travel = vault.settings.travel_mode;
         let entry = vault
             .vault_entries
             .iter_mut()
-            .find(|e| e.id == entry_id && is_active(e))
+            .find(|e| e.id == entry_id && is_visible(e, travel))
             .ok_or("Entry not found".to_string())?;
         let name = entry.name.clone();
         entry.deleted_at = Some(now_ts());
@@ -198,10 +210,11 @@ pub fn purge_vault_entry(entry_id: String) -> Result<(), String> {
 pub fn list_trashed_entries() -> Result<Vec<VaultEntryPublic>, String> {
     let key = get_key()?;
     let vault = load_active_vault(&key).map_err(|e| e.to_string())?;
+    let travel = vault.settings.travel_mode;
     Ok(vault
         .vault_entries
         .iter()
-        .filter(|e| e.deleted_at.is_some())
+        .filter(|e| e.deleted_at.is_some() && !is_travel_hidden(e, travel))
         .map(entry_public)
         .collect())
 }
@@ -246,10 +259,11 @@ pub fn update_vault_entry(
     notes: Option<String>,
 ) -> Result<VaultEntryPublic, String> {
     let (public, changes) = with_vault(|vault| {
+        let travel = vault.settings.travel_mode;
         let entry = vault
             .vault_entries
             .iter_mut()
-            .find(|e| e.id == entry_id && is_active(e))
+            .find(|e| e.id == entry_id && is_visible(e, travel))
             .ok_or("Entry not found".to_string())?;
 
         let mut changes: Vec<(String, String, String)> = Vec::new();
@@ -310,7 +324,12 @@ pub fn get_vault_entries_page(offset: u64, limit: u64) -> Result<VaultEntriesPag
     let key = get_key()?;
     let limit = limit.clamp(1, 500);
     let vault = load_active_vault(&key).map_err(|e| e.to_string())?;
-    let active: Vec<&VaultEntry> = vault.vault_entries.iter().filter(|e| is_active(e)).collect();
+    let travel = vault.settings.travel_mode;
+    let active: Vec<&VaultEntry> = vault
+        .vault_entries
+        .iter()
+        .filter(|e| is_visible(e, travel))
+        .collect();
     let total = active.len() as u64;
     let entries: Vec<VaultEntryPublic> = active
         .into_iter()
@@ -330,17 +349,19 @@ pub fn get_vault_entries_page(offset: u64, limit: u64) -> Result<VaultEntriesPag
 pub fn get_vault_entry_count() -> Result<u64, String> {
     let key = get_key()?;
     let vault = load_active_vault(&key).map_err(|e| e.to_string())?;
-    Ok(vault.vault_entries.iter().filter(|e| is_active(e)).count() as u64)
+    let travel = vault.settings.travel_mode;
+    Ok(vault.vault_entries.iter().filter(|e| is_visible(e, travel)).count() as u64)
 }
 
 #[tauri::command]
 pub fn get_vault_entries() -> Result<Vec<VaultEntryPublic>, String> {
     let key = get_key()?;
     let vault = load_active_vault(&key).map_err(|e| e.to_string())?;
+    let travel = vault.settings.travel_mode;
     Ok(vault
         .vault_entries
         .iter()
-        .filter(|e| is_active(e))
+        .filter(|e| is_visible(e, travel))
         .map(entry_public)
         .collect())
 }
@@ -356,10 +377,11 @@ pub fn reveal_entry_secret(entry_id: String, password: String) -> Result<String,
         return Err("Incorrect master password".to_string());
     }
     let vault = load_active_vault(&key).map_err(|e| e.to_string())?;
+    let travel = vault.settings.travel_mode;
     let entry = vault
         .vault_entries
         .iter()
-        .find(|e| e.id == entry_id && is_active(e))
+        .find(|e| e.id == entry_id && is_visible(e, travel))
         .ok_or_else(|| "Entry not found".to_string())?;
     Ok(entry.secret.clone())
 }
@@ -375,10 +397,11 @@ pub fn reveal_entry_notes(entry_id: String, password: String) -> Result<String, 
         return Err("Incorrect master password".to_string());
     }
     let vault = load_active_vault(&key).map_err(|e| e.to_string())?;
+    let travel = vault.settings.travel_mode;
     let entry = vault
         .vault_entries
         .iter()
-        .find(|e| e.id == entry_id && is_active(e))
+        .find(|e| e.id == entry_id && is_visible(e, travel))
         .ok_or_else(|| "Entry not found".to_string())?;
     Ok(entry.notes.clone())
 }
@@ -394,10 +417,11 @@ pub fn generate_otp(entry_id: String) -> Result<OtpCode, String> {
         clock_drift: vault.settings.clock_drift_seconds,
     };
 
+    let travel = vault.settings.travel_mode;
     let idx = vault
         .vault_entries
         .iter()
-        .position(|e| e.id == entry_id && is_active(e))
+        .position(|e| e.id == entry_id && is_visible(e, travel))
         .ok_or("Entry not found")?;
 
     let entry = &vault.vault_entries[idx];
@@ -428,10 +452,11 @@ pub fn verify_otp(entry_id: String, code: String) -> Result<bool, String> {
         clock_drift: vault.settings.clock_drift_seconds,
     };
 
+    let travel = vault.settings.travel_mode;
     let entry = vault
         .vault_entries
         .iter()
-        .find(|e| e.id == entry_id && is_active(e))
+        .find(|e| e.id == entry_id && is_visible(e, travel))
         .ok_or("Entry not found")?;
 
     totp_gen::verify_code(
@@ -463,10 +488,11 @@ pub fn get_provisioning_uri(entry_id: String, password: String) -> Result<String
     }
     let vault = load_active_vault(&key).map_err(|e| e.to_string())?;
 
+    let travel = vault.settings.travel_mode;
     let entry = vault
         .vault_entries
         .iter()
-        .find(|e| e.id == entry_id && is_active(e))
+        .find(|e| e.id == entry_id && is_visible(e, travel))
         .ok_or("Entry not found")?;
 
     totp_gen::get_provisioning_uri(
@@ -595,7 +621,10 @@ pub fn update_settings(settings: AppSettings) -> Result<(), String> {
         return Err(format!("Unsupported language: {}", settings.language));
     }
     with_vault(|vault| {
+        // Travel mode changes only via `set_travel_mode` (disable needs master password).
+        let travel_mode = vault.settings.travel_mode;
         vault.settings = settings;
+        vault.settings.travel_mode = travel_mode;
         Ok(())
     })
 }
@@ -835,7 +864,7 @@ pub fn search_vault_entries(query: String) -> Result<Vec<VaultEntryPublic>, Stri
     with_vault(|vault| {
         let query_lower = query.to_lowercase();
         Ok(vault.vault_entries.iter()
-            .filter(|entry| is_active(entry))
+            .filter(|entry| is_visible(entry, vault.settings.travel_mode))
             .filter(|entry| {
                 entry.name.to_lowercase().contains(&query_lower) ||
                 entry.issuer.to_lowercase().contains(&query_lower) ||
@@ -851,7 +880,7 @@ pub fn search_vault_entries(query: String) -> Result<Vec<VaultEntryPublic>, Stri
 pub fn filter_vault_entries_by_category(category: String) -> Result<Vec<VaultEntryPublic>, String> {
     with_vault(|vault| {
         Ok(vault.vault_entries.iter()
-            .filter(|entry| is_active(entry) && entry.category == category)
+            .filter(|entry| is_visible(entry, vault.settings.travel_mode) && entry.category == category)
             .map(entry_public)
             .collect())
     })
@@ -861,7 +890,7 @@ pub fn filter_vault_entries_by_category(category: String) -> Result<Vec<VaultEnt
 pub fn filter_vault_entries_by_tags(tags: Vec<String>) -> Result<Vec<VaultEntryPublic>, String> {
     with_vault(|vault| {
         Ok(vault.vault_entries.iter()
-            .filter(|entry| is_active(entry) && tags.iter().all(|tag| entry.tags.contains(tag)))
+            .filter(|entry| is_visible(entry, vault.settings.travel_mode) && tags.iter().all(|tag| entry.tags.contains(tag)))
             .map(entry_public)
             .collect())
     })
@@ -871,7 +900,7 @@ pub fn filter_vault_entries_by_tags(tags: Vec<String>) -> Result<Vec<VaultEntryP
 pub fn get_favorite_entries() -> Result<Vec<VaultEntryPublic>, String> {
     with_vault(|vault| {
         Ok(vault.vault_entries.iter()
-            .filter(|entry| is_active(entry) && entry.favorite)
+            .filter(|entry| is_visible(entry, vault.settings.travel_mode) && entry.favorite)
             .map(entry_public)
             .collect())
     })
@@ -880,7 +909,8 @@ pub fn get_favorite_entries() -> Result<Vec<VaultEntryPublic>, String> {
 #[tauri::command]
 pub fn toggle_entry_favorite(entry_id: String) -> Result<bool, String> {
     let (name, new_favorite, old_favorite) = with_vault(|vault| {
-        if let Some(entry) = vault.vault_entries.iter_mut().find(|e| e.id == entry_id) {
+        let travel = vault.settings.travel_mode;
+        if let Some(entry) = vault.vault_entries.iter_mut().find(|e| e.id == entry_id && is_visible(e, travel)) {
             let old = entry.favorite;
             entry.favorite = !entry.favorite;
             Ok((entry.name.clone(), entry.favorite, old))
@@ -902,7 +932,8 @@ pub fn toggle_entry_favorite(entry_id: String) -> Result<bool, String> {
 #[tauri::command]
 pub fn update_entry_tags(entry_id: String, tags: Vec<String>) -> Result<(), String> {
     let (name, old_tags) = with_vault(|vault| {
-        if let Some(entry) = vault.vault_entries.iter_mut().find(|e| e.id == entry_id) {
+        let travel = vault.settings.travel_mode;
+        if let Some(entry) = vault.vault_entries.iter_mut().find(|e| e.id == entry_id && is_visible(e, travel)) {
             let old = entry.tags.join(",");
             entry.tags = tags.clone();
             Ok((entry.name.clone(), old))
@@ -927,6 +958,7 @@ pub fn update_entry_tags(entry_id: String, tags: Vec<String>) -> Result<(), Stri
 pub fn generate_emergency_codes(count: usize) -> Result<Vec<String>, String> {
     use rand::Rng;
     let mut rng = rand::thread_rng();
+    let count = count.clamp(1, 20);
     let codes: Vec<String> = (0..count)
         .map(|_| {
             (0..16)
@@ -1020,7 +1052,12 @@ pub fn check_pwned_password(password: String) -> Result<u32, String> {
 pub fn run_security_audit() -> Result<crate::models::SecurityAuditResult, String> {
     let (entries, hibp_enabled) = with_vault(|vault| {
         Ok((
-            vault.vault_entries.clone(),
+            vault
+                .vault_entries
+                .iter()
+                .filter(|e| is_visible(e, vault.settings.travel_mode))
+                .cloned()
+                .collect::<Vec<_>>(),
             vault.settings.hibp_audit_enabled,
         ))
     })?;
@@ -1186,22 +1223,32 @@ pub fn export_vault_csv() -> Result<String, String> {
             let tags_str = entry.tags.join(";");
             csv.push_str(&format!(
                 "{},{},{},{},{},{},{},{},{},{},{}\n",
-                entry.name,
-                entry.issuer,
-                entry.category,
-                entry.icon,
-                entry.color,
+                csv_field(&entry.name),
+                csv_field(&entry.issuer),
+                csv_field(&entry.category),
+                csv_field(&entry.icon),
+                csv_field(&entry.color),
                 entry.digits,
                 entry.period,
                 entry.created_at,
                 entry.last_used,
-                tags_str,
+                csv_field(&tags_str),
                 entry.favorite,
             ));
         }
         Ok(csv)
     })?;
     Ok(csv)
+}
+
+/// RFC 4180 quoting plus a leading `'` on spreadsheet formula triggers.
+fn csv_field(value: &str) -> String {
+    let neutralized = if value.starts_with(['=', '+', '-', '@', '\t', '\r']) {
+        format!("'{value}")
+    } else {
+        value.to_string()
+    };
+    format!("\"{}\"", neutralized.replace('"', "\"\""))
 }
 
 // ===== Bulk Operations =====
@@ -1230,7 +1277,7 @@ pub fn bulk_update_category(entry_ids: Vec<String>, new_category: String) -> Res
     let updated_count = with_vault(|vault| {
         let mut count = 0;
         for entry in &mut vault.vault_entries {
-            if entry_ids.contains(&entry.id) {
+            if entry_ids.contains(&entry.id) && is_active(entry) {
                 entry.category = new_category.clone();
                 count += 1;
             }
@@ -1245,7 +1292,7 @@ pub fn bulk_add_tags(entry_ids: Vec<String>, tags: Vec<String>) -> Result<usize,
     let updated_count = with_vault(|vault| {
         let mut count = 0;
         for entry in &mut vault.vault_entries {
-            if entry_ids.contains(&entry.id) {
+            if entry_ids.contains(&entry.id) && is_active(entry) {
                 for tag in &tags {
                     if !entry.tags.contains(tag) {
                         entry.tags.push(tag.clone());
@@ -1264,7 +1311,7 @@ pub fn bulk_remove_tags(entry_ids: Vec<String>, tags: Vec<String>) -> Result<usi
     let updated_count = with_vault(|vault| {
         let mut count = 0;
         for entry in &mut vault.vault_entries {
-            if entry_ids.contains(&entry.id) {
+            if entry_ids.contains(&entry.id) && is_active(entry) {
                 entry.tags.retain(|t| !tags.contains(t));
                 count += 1;
             }
@@ -1278,6 +1325,7 @@ pub fn bulk_remove_tags(entry_ids: Vec<String>, tags: Vec<String>) -> Result<usi
 
 #[tauri::command]
 pub fn create_vault_transfer(passphrase: String) -> Result<String, String> {
+    ensure_export_allowed()?;
     super::validate_master_password(&passphrase)?;
     let key = get_key()?;
     let vault = load_active_vault(&key).map_err(|e| e.to_string())?;
@@ -1292,6 +1340,7 @@ pub fn create_vault_transfer(passphrase: String) -> Result<String, String> {
 
 #[tauri::command]
 pub fn import_vault_transfer(passphrase: String, payload: String) -> Result<usize, String> {
+    ensure_export_allowed()?;
     super::validate_master_password(&passphrase)?;
     let imported = import_export::import_transfer_payload(&payload, &passphrase)?;
     let count = imported.len();
@@ -1327,6 +1376,7 @@ pub fn create_vault_share(
     passphrase: String,
     expires_hours: Option<u32>,
 ) -> Result<VaultShareExport, String> {
+    ensure_export_allowed()?;
     super::validate_master_password(&passphrase)?;
     if entry_ids.is_empty() {
         return Err("Select at least one entry to share".to_string());
@@ -1391,6 +1441,7 @@ pub fn create_vault_share(
 
 #[tauri::command]
 pub fn import_vault_share(passphrase: String, payload: String) -> Result<usize, String> {
+    ensure_export_allowed()?;
     super::validate_master_password(&passphrase)?;
     let package = import_export::import_share_payload(&payload, &passphrase)?;
     let count = package.entries.len();
@@ -1476,10 +1527,11 @@ pub fn get_language() -> Result<String, String> {
 #[tauri::command]
 pub fn list_entry_attachments(entry_id: String) -> Result<Vec<EntryAttachmentMeta>, String> {
     with_vault(|vault| {
+        let travel = vault.settings.travel_mode;
         let entry = vault
             .vault_entries
             .iter()
-            .find(|e| e.id == entry_id)
+            .find(|e| e.id == entry_id && is_visible(e, travel))
             .ok_or_else(|| "Entry not found".to_string())?;
         Ok(entry.attachments.clone())
     })
@@ -1497,10 +1549,11 @@ pub fn add_entry_attachment(
     let meta = crate::attachments::new_attachment_meta(&filename, &mime_type, data.len() as u64);
 
     with_vault(|vault| {
+        let travel = vault.settings.travel_mode;
         let entry = vault
             .vault_entries
             .iter()
-            .find(|e| e.id == entry_id)
+            .find(|e| e.id == entry_id && is_visible(e, travel))
             .ok_or_else(|| "Entry not found".to_string())?;
         if entry.attachments.len() >= crate::attachments::max_per_entry() {
             return Err(format!(
@@ -1515,10 +1568,11 @@ pub fn add_entry_attachment(
         .map_err(|e| e.to_string())?;
 
     with_vault(|vault| {
+        let travel = vault.settings.travel_mode;
         let entry = vault
             .vault_entries
             .iter_mut()
-            .find(|e| e.id == entry_id)
+            .find(|e| e.id == entry_id && is_visible(e, travel))
             .ok_or_else(|| "Entry not found".to_string())?;
         entry.attachments.push(meta.clone());
         Ok(())
@@ -1573,10 +1627,11 @@ pub fn export_entry_attachment(
         return Err("Incorrect master password".to_string());
     }
     let (filename, data) = with_vault(|vault| {
+        let travel = vault.settings.travel_mode;
         let entry = vault
             .vault_entries
             .iter()
-            .find(|e| e.id == entry_id)
+            .find(|e| e.id == entry_id && is_visible(e, travel))
             .ok_or_else(|| "Entry not found".to_string())?;
         let attachment = entry
             .attachments

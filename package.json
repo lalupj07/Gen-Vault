@@ -1,8 +1,8 @@
 {
   "name": "genvault",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "private": true,
-  "description": "GenVault v2.3.0 — Offline Authentication Vault by GenXis Innovations",
+  "description": "GenVault v2.3.1: Offline Authentication Vault by GenXis Innovations",
   "author": "GenXis Innovations <genxisinnovation@outlook.com>",
   "license": "MIT",
   "scripts": {

@@ -6,7 +6,7 @@ use std::sync::OnceLock;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 
-use crate::commands::{ensure_lock_suite_allowed, get_key};
+use crate::commands::{ensure_lock_suite_allowed, get_key, is_duress_session};
 use crate::folder_lock::deep_link::FolderLockDeepLink;
 use crate::folder_lock::service::{FolderLockService, LockedFolderPublic, ServiceError};
 use crate::folder_lock::store::ActivityRow;
@@ -88,6 +88,9 @@ fn save_settings(settings: &FolderLockSettings) -> Result<(), String> {
 pub fn folder_lock_list() -> Result<Vec<LockedFolderPublic>, String> {
     require_windows()?;
     let _key = get_key()?;
+    if is_duress_session() {
+        return Ok(Vec::new());
+    }
     service()?.list().map_err(map_err)
 }
 
@@ -95,6 +98,9 @@ pub fn folder_lock_list() -> Result<Vec<LockedFolderPublic>, String> {
 pub fn folder_lock_search(query: String) -> Result<Vec<LockedFolderPublic>, String> {
     require_windows()?;
     let _key = get_key()?;
+    if is_duress_session() {
+        return Ok(Vec::new());
+    }
     let q = query.trim().to_lowercase();
     let list = service()?.list().map_err(map_err)?;
     if q.is_empty() {
@@ -146,6 +152,7 @@ pub fn folder_lock_relock(id: String) -> Result<(), String> {
 pub fn folder_lock_restore(id: String) -> Result<(), String> {
     require_windows()?;
     ensure_lock_suite_allowed()?;
+    crate::commands::privacy::ensure_export_allowed()?;
     let key = get_key()?;
     service()?.restore_to_original(&id, &key).map_err(map_err)
 }
@@ -162,6 +169,9 @@ pub fn folder_lock_set_favorite(id: String, favorite: bool) -> Result<(), String
 pub fn folder_lock_activity(limit: Option<usize>) -> Result<Vec<ActivityRow>, String> {
     require_windows()?;
     let _key = get_key()?;
+    if is_duress_session() {
+        return Ok(Vec::new());
+    }
     service()?.activity(limit.unwrap_or(50)).map_err(map_err)
 }
 

@@ -16,7 +16,7 @@ pub fn write_protected(path: &std::path::Path, data: &[u8]) -> Result<(), StoreE
         };
         let mut output = CRYPT_INTEGER_BLOB::default();
         unsafe {
-            CryptProtectData(
+            let res = CryptProtectData(
                 &mut input,
                 None,
                 None,
@@ -24,8 +24,9 @@ pub fn write_protected(path: &std::path::Path, data: &[u8]) -> Result<(), StoreE
                 None,
                 CRYPTPROTECT_UI_FORBIDDEN,
                 &mut output,
-            )
-            .map_err(|e| StoreError::Keyring(format!("DPAPI protect failed: {}", e)))?;
+            );
+            zeroize::Zeroize::zeroize(&mut data_vec);
+            res.map_err(|e| StoreError::Keyring(format!("DPAPI protect failed: {}", e)))?;
 
             let protected =
                 std::slice::from_raw_parts(output.pbData, output.cbData as usize).to_vec();
@@ -89,6 +90,12 @@ pub fn read_protected(path: &std::path::Path) -> Result<Vec<u8>, StoreError> {
             .map_err(|e| StoreError::Keyring(format!("DPAPI unprotect failed: {}", e)))?;
 
             let plain = std::slice::from_raw_parts(output.pbData, output.cbData as usize).to_vec();
+            if !output.pbData.is_null() {
+                zeroize::Zeroize::zeroize(std::slice::from_raw_parts_mut(
+                    output.pbData,
+                    output.cbData as usize,
+                ));
+            }
             let _ = LocalFree(windows::Win32::Foundation::HLOCAL(output.pbData as _));
             return Ok(plain);
         }

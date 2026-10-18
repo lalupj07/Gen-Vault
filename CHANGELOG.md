@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.3.1] - 2026-10-02
+
+### Highlights
+
+Security release for Windows and Android, from the 2026-10-02 audit (`docs/audit/2026-10-02-audit-report.md`). Windows MSIX/APPX package for the Microsoft Store.
+
+### Security
+
+- **Duress sessions** can no longer change the real master password, recovery codes or security keys, and a restore during duress writes only to the decoy vault
+- **Travel mode** now blocks share, transfer, backup restore, media export and file/folder restore. Turning travel mode off requires the master password. Entries tagged `travel-hide` are hidden by the Rust backend, not just the UI
+- **Lock suite**: the staging wipe no longer follows symlinks or junctions; the media "open" command no longer goes through a shell; duress sessions see empty lock-suite lists
+- **File Lock deep links** prefill the form and wait for you to press Lock or Unlock
+- **Sign-up on an existing account** counts toward the unlock lockout
+- **Guest grants** reject malformed IDs and detect tampered expiry times
+- **Imports**: size and entry-count caps, crafted otpauth links return an error instead of crashing, Google imports reject period 0, shared and transferred entries are sanitized
+- **CSV export** neutralizes spreadsheet formulas
+- Derived keys and decrypted buffers are zeroized; `auth.json` and `vault.enc` are written atomically
+- **Android**: OS cloud backup, `adb backup` and device transfer are disabled for app data
+- CI actions pinned to commit SHAs with read-only default permissions; `cargo audit` added
+
+### Changed
+
+- Play Store listing and Data Safety text now describe Autofill as an unlock prompt (fill is not shipped yet)
+
+### Notes
+
+- Guest grants created before 2.3.1 stop working (they last at most 60 minutes)
+- MSIX version `2.3.1.0`
+
+---
+
 ## [2.3.0] - 2026-09-11
 
 ### Highlights

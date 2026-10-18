@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use uuid::Uuid;
 use zeroize::Zeroize;
 
-use super::{entry_public, get_key, is_duress_session, load_active_vault, now_ts, session, set_duress_session, validate_master_password, with_vault};
+use super::{ensure_not_duress, entry_public, get_key, is_duress_session, load_active_vault, now_ts, save_active_vault, session, set_duress_session, validate_master_password, with_vault};
 use crate::commands::privacy::ensure_export_allowed;
 use crate::hello;
 use crate::models::*;
@@ -226,10 +226,13 @@ fn sign_up_inner(
     }
 
     if store::account_exists().map_err(|e| format!("Failed to check account existence: {}", e))? {
+        // should_reset_for_signup tries the master password; share the unlock budget.
+        rate_limit::check_allowed("unlock")?;
         if store::should_reset_for_signup(&master_password).map_err(|e| e.to_string())? {
             store::delete_account()
                 .map_err(|e| format!("Failed to reset incomplete account: {}", e))?;
         } else {
+            let _ = rate_limit::record_failure("unlock");
             #[cfg(target_os = "android")]
             const RESET_HINT: &str = "An account already exists on this device. Sign in with your password, or clear GenVault app data in Settings and try again.";
             #[cfg(not(target_os = "android"))]
@@ -417,6 +420,7 @@ pub fn hello_available() -> bool {
 /// Set (or replace) the master password. Transitions the account to secure mode.
 #[tauri::command]
 pub fn set_master_password(password: String) -> Result<(), String> {
+    ensure_not_duress()?;
     validate_master_password(&password)?;
     let key = get_key()?;
     store::enroll_secret("password", &password, &key).map_err(|e| e.to_string())?;
@@ -441,6 +445,7 @@ pub fn set_pin(_pin: String) -> Result<(), String> {
 /// Remove the unlock PIN.
 #[tauri::command]
 pub fn remove_pin() -> Result<(), String> {
+    ensure_not_duress()?;
     let key = get_key()?;
     store::delete_secret("pin", &key).map_err(|e| e.to_string())?;
     with_vault(|vault| {
@@ -464,6 +469,7 @@ pub fn has_pin() -> Result<bool, String> {
 /// Enroll Windows Hello as a convenience unlock method.
 #[tauri::command]
 pub fn enroll_hello(window: tauri::WebviewWindow) -> Result<(), String> {
+    ensure_not_duress()?;
     if !hello::is_available() {
         return Err("Biometric unlock is not available on this device".to_string());
     }
@@ -500,6 +506,7 @@ fn window_hwnd(_window: &tauri::WebviewWindow) -> Result<isize, String> {
 /// Remove an enrolled unlock method ("password" | "pin" | "hello").
 #[tauri::command]
 pub fn remove_unlock_method(kind: String) -> Result<(), String> {
+    ensure_not_duress()?;
     let key = get_key()?;
     store::remove_method(&kind, &key).map_err(|e| e.to_string())?;
     with_vault(|vault| {
@@ -793,9 +800,9 @@ pub fn get_password_health() -> Result<crate::models::PasswordHealth, String> {
         if total_entries == 0 {
             score = 100;
         } else {
-            score -= (weak_passwords as u8 * 10).min(30);
-            score -= (reused_secrets as u8 * 15).min(30);
-            score -= (old_entries as u8 * 5).min(20);
+            score -= (weak_passwords.min(3) * 10) as u8;
+            score -= (reused_secrets.min(2) * 15) as u8;
+            score -= (old_entries.min(4) * 5) as u8;
         }
 
         Ok(crate::models::PasswordHealth {
@@ -1052,10 +1059,10 @@ pub fn export_backup(passphrase: String) -> Result<String, String> {
 /// current device's vault key. Requires an unlocked vault.
 #[tauri::command]
 pub fn restore_backup(passphrase: String, backup_json: String) -> Result<(), String> {
+    ensure_export_allowed()?;
     let key = get_key()?;
     let restored = store::decode_backup(&passphrase, &backup_json).map_err(|e| e.to_string())?;
-    store::save_vault_with_key(&restored, &key).map_err(|e| e.to_string())?;
-    Ok(())
+    save_active_vault(&restored, &key)
 }
 
 #[tauri::command]
@@ -1087,7 +1094,8 @@ pub fn update_user(display_name: Option<String>, username: Option<String>) -> Re
         Ok(user.clone())
     })?;
 
-    if let Some(un) = username {
+    // Duress: only the decoy profile changes; the real login hint in auth.json stays.
+    if let Some(un) = username.filter(|_| !is_duress_session()) {
         store::update_username(&un).map_err(|e| e.to_string())?;
     }
 

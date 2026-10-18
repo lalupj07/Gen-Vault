@@ -190,16 +190,15 @@ export default function FileLockView({
       : prefill.path
         ? [prefill.path]
         : [];
+    // Deep links can come from outside the app: prefill only, the user confirms with a click.
     if (paths.length) setLockPaths(paths.join('\n'));
     if (prefill.action === 'unlock' && prefill.id) {
-      void handleUnlock(prefill.id).finally(() => onPrefillConsumed?.());
+      setMessage('Unlock requested from a link. Press Unlock on the file below to continue.');
     } else if (prefill.action === 'lock' && paths.length) {
-      void doLock(paths, false).finally(() => onPrefillConsumed?.());
-    } else {
-      onPrefillConsumed?.();
+      setMessage('Lock requested from a link. Review the paths, then press Lock.');
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prefill]);
+    onPrefillConsumed?.();
+  }, [prefill, onPrefillConsumed]);
 
   const handleRelock = async (id: string) => {
     setBusy(true);

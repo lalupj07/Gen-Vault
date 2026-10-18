@@ -95,11 +95,15 @@ fn data_dir() -> Result<PathBuf, StoreError> {
 }
 
 fn write_atomic(path: &std::path::Path, data: &[u8]) -> Result<(), StoreError> {
+    use std::io::Write;
     let tmp = path.with_extension("tmp");
-    fs::write(&tmp, data)?;
-    if path.exists() {
-        let _ = fs::remove_file(path);
+    {
+        let mut f = fs::File::create(&tmp)?;
+        f.write_all(data)?;
+        f.sync_all()?;
     }
+    // rename replaces the target atomically (MoveFileExW REPLACE_EXISTING on Windows);
+    // never delete the original first or a crash loses auth.json / vault.enc.
     match fs::rename(&tmp, path) {
         Ok(()) => Ok(()),
         Err(_) => {
@@ -336,13 +340,9 @@ pub fn get_enrolled_question_ids() -> Result<Vec<String>, StoreError> {
 }
 /// Update the stored username in auth metadata
 pub fn update_username(new_username: &str) -> Result<(), StoreError> {
-    let path = meta_path()?;
-    let data = fs::read_to_string(&path)?;
-    let mut meta: AuthMeta = serde_json::from_str(&data)?;
+    let mut meta = load_meta()?;
     meta.username = new_username.to_string();
-    let json = serde_json::to_string_pretty(&meta)?;
-    fs::write(path, json)?;
-    Ok(())
+    save_meta(&meta)
 }
 
 /// Rotate the vault master key using the current in-memory VMK.
@@ -463,60 +463,6 @@ fn remove_dir_contents(dir: &std::path::Path) -> Result<(), StoreError> {
 
 fn protector_path(name: &str) -> Result<PathBuf, StoreError> {
     Ok(data_dir()?.join(name))
-}
-
-fn save_protector_key(filename: &str, key: &[u8; 32]) -> Result<(), StoreError> {
-    write_protected_file(
-        &protector_path(filename)?,
-        crypto::bytes_to_hex(key).as_bytes(),
-    )
-}
-
-fn load_protector_key(filename: &str, legacy_kind: &str) -> Result<[u8; 32], StoreError> {
-    let path = protector_path(filename)?;
-    if path.exists() {
-        let raw = read_protected_file(&path)?;
-        let hex = String::from_utf8(raw).map_err(|_| StoreError::InvalidSecret)?;
-        let bytes = crypto::hex_to_bytes(hex.trim())?;
-        if bytes.len() != 32 {
-            return Err(StoreError::Keyring(
-                "Invalid protector key length".to_string(),
-            ));
-        }
-        let mut key = [0u8; 32];
-        key.copy_from_slice(&bytes);
-        return Ok(key);
-    }
-
-    // Migrate legacy keyring protector → DPAPI-protected file.
-    #[cfg(target_os = "android")]
-    {
-        let _ = legacy_kind;
-        return Err(StoreError::Keyring("unavailable".into()));
-    }
-
-    #[cfg(not(target_os = "android"))]
-    {
-        let legacy = match legacy_kind {
-            "hello" => hpk_entry()?,
-            "fido" => fpk_entry()?,
-            _ => return Err(StoreError::MethodNotFound),
-        };
-        let hex_key = legacy
-            .get_password()
-            .map_err(|e| StoreError::Keyring(e.to_string()))?;
-        let bytes = crypto::hex_to_bytes(&hex_key)?;
-        if bytes.len() != 32 {
-            return Err(StoreError::Keyring(
-                "Invalid protector key length".to_string(),
-            ));
-        }
-        let mut key = [0u8; 32];
-        key.copy_from_slice(&bytes);
-        save_protector_key(filename, &key)?;
-        let _ = legacy.delete_credential();
-        Ok(key)
-    }
 }
 
 fn delete_protector_key(filename: &str, legacy_kind: &str) -> Result<(), StoreError> {
@@ -749,8 +695,10 @@ pub fn enroll_secret(kind: &str, secret: &str, vmk: &[u8; 32]) -> Result<(), Sto
     let mut meta = load_meta()?;
 
     let salt = crypto::generate_salt();
-    let wrap_key = crypto::derive_key(secret, &salt)?;
-    let wrapped_key = crypto::encrypt(vmk, &wrap_key)?;
+    let mut wrap_key = crypto::derive_key(secret, &salt)?;
+    let wrapped_key = crypto::encrypt(vmk, &wrap_key);
+    wrap_key.zeroize();
+    let wrapped_key = wrapped_key?;
 
     meta.methods.retain(|m| m.kind != kind);
     meta.methods.push(UnlockMethod {
@@ -855,11 +803,14 @@ pub fn export_backup(passphrase: &str, vmk: &[u8; 32], duress: bool) -> Result<S
     } else {
         load_vault_with_key(vmk)?
     };
-    let plaintext = serde_json::to_vec(&vault)?;
+    let mut plaintext = serde_json::to_vec(&vault)?;
 
     let salt = crypto::generate_salt();
-    let key = crypto::derive_key(passphrase, &salt)?;
-    let ciphertext = crypto::encrypt(&plaintext, &key)?;
+    let mut key = crypto::derive_key(passphrase, &salt)?;
+    let ciphertext = crypto::encrypt(&plaintext, &key);
+    key.zeroize();
+    plaintext.zeroize();
+    let ciphertext = ciphertext?;
 
     let backup = serde_json::json!({
         "format": "genvault-backup",
@@ -889,11 +840,14 @@ pub fn decode_backup(passphrase: &str, backup_json: &str) -> Result<VaultData, S
     let salt = crypto::hex_to_bytes(salt_hex)?;
     let ciphertext = crypto::hex_to_bytes(data_hex)?;
 
-    let key = crypto::derive_key(passphrase, &salt)?;
-    let plaintext = crypto::decrypt(&ciphertext, &key).map_err(|_| StoreError::InvalidSecret)?;
+    let mut key = crypto::derive_key(passphrase, &salt)?;
+    let plaintext = crypto::decrypt(&ciphertext, &key);
+    key.zeroize();
+    let mut plaintext = plaintext.map_err(|_| StoreError::InvalidSecret)?;
 
-    let vault: VaultData = serde_json::from_slice(&plaintext)?;
-    Ok(vault)
+    let vault = serde_json::from_slice::<VaultData>(&plaintext);
+    plaintext.zeroize();
+    Ok(vault?)
 }
 
 /// Legacy security-question recovery is disabled — prefer recovery codes.
@@ -1012,8 +966,10 @@ pub fn save_duress_vault_with_key(vault: &VaultData, key: &[u8; 32]) -> Result<(
 
 fn save_duress_key_wrap(duress_password: &str, vmk: &[u8; 32]) -> Result<(), StoreError> {
     let salt = crypto::generate_salt();
-    let wrap_key = crypto::derive_key(duress_password, &salt)?;
-    let wrapped_key = crypto::encrypt(vmk, &wrap_key)?;
+    let mut wrap_key = crypto::derive_key(duress_password, &salt)?;
+    let wrapped_key = crypto::encrypt(vmk, &wrap_key);
+    wrap_key.zeroize();
+    let wrapped_key = wrapped_key?;
     let wrap = DuressKeyWrap { salt, wrapped_key };
     write_atomic(
         &duress_key_path()?,
@@ -1110,6 +1066,16 @@ mod tests {
         let key = create_account("testuser").unwrap();
         enroll_secret("password", master, &key).unwrap();
         key
+    }
+
+    #[test]
+    fn write_atomic_replaces_existing_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("auth.json");
+        write_atomic(&path, b"old").unwrap();
+        write_atomic(&path, b"new").unwrap();
+        assert_eq!(fs::read(&path).unwrap(), b"new");
+        assert!(!path.with_extension("tmp").exists());
     }
 
     #[test]

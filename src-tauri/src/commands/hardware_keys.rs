@@ -4,7 +4,7 @@ use uuid::Uuid;
 use crate::models::{HardwareSecurityKey, HardwareSecurityKeyPublic};
 use crate::rate_limit;
 use crate::store;
-use super::{get_key, now_ts};
+use super::{ensure_not_duress, get_key, now_ts, set_duress_session};
 use super::auth::finalize_unlock;
 
 fn to_public(key: &HardwareSecurityKey, unlock_enrolled: bool) -> HardwareSecurityKeyPublic {
@@ -38,6 +38,7 @@ pub fn register_hardware_key(name: String, pin: Option<String>) -> Result<Hardwa
     if name.trim().is_empty() {
         return Err("Key name is required".to_string());
     }
+    ensure_not_duress()?;
     if !crate::fido::is_available() {
         return Err("No FIDO2 security key detected. Insert a USB key and try again.".to_string());
     }
@@ -87,6 +88,7 @@ pub fn test_hardware_key(key_id: String, pin: Option<String>) -> Result<(), Stri
 #[tauri::command]
 pub fn remove_hardware_key(key_id: String) -> Result<(), String> {
     let _session = get_key()?;
+    ensure_not_duress()?;
     store::remove_security_key_record(&key_id).map_err(|e| e.to_string())
 }
 
@@ -120,6 +122,7 @@ pub fn unlock_with_security_key(
             Ok(vmk) => {
                 rate_limit::record_success("unlock").map_err(|e| e.to_string())?;
                 store::touch_security_key(&key_id).map_err(|e| e.to_string())?;
+                set_duress_session(false);
                 finalize_unlock(vmk)
             }
             Err(e) => {

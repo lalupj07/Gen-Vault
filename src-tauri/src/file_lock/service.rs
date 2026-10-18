@@ -6,6 +6,7 @@ use crate::crypto;
 use crate::folder_lock::crypto_files::{
     decrypt_file_bytes, encrypt_file_bytes, unwrap_dek, wrap_dek,
 };
+use crate::folder_lock::remove_if_link;
 use serde::{Deserialize, Serialize};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
@@ -470,7 +471,7 @@ fn secure_wipe_file(path: &Path) -> Result<(), ServiceError> {
 }
 
 fn wipe_dir_tree(path: &Path) -> Result<(), ServiceError> {
-    if !path.exists() {
+    if remove_if_link(path)? || !path.exists() {
         return Ok(());
     }
     prepare_writable(path)?;
@@ -482,6 +483,9 @@ fn wipe_dir_tree(path: &Path) -> Result<(), ServiceError> {
     for entry in fs::read_dir(path)? {
         let entry = entry?;
         let p = entry.path();
+        if remove_if_link(&p)? {
+            continue;
+        }
         if p.is_dir() {
             wipe_dir_tree(&p)?;
         } else {
